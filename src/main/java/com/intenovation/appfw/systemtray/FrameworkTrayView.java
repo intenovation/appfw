@@ -1,6 +1,8 @@
 package com.intenovation.appfw.systemtray;
 
-import java.awt.*;
+import java.awt.MenuComponent;
+import java.awt.TrayIcon;
+import java.awt.Dimension;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -13,97 +15,74 @@ import com.intenovation.appfw.inversemv.View;
 /**
  * Framework-specific tray view implementation that integrates with the
  * intenovation application framework components.
- * 
- * This class combines functionality from the old tray package's
- * AbstractTrayView and RootTrayView classes.
  */
 public class FrameworkTrayView implements View {
     private static final Logger log = Logger.getLogger(FrameworkTrayView.class.getName());
-    
+
     protected String appname;
     protected TrayIcon trayIcon;
-    protected SystemTray tray;
-    protected ParentModel model;
-    protected PopupMenu menu;
+    protected ParentModel parent;
+    protected Model model;
     protected SmartIcon icon;
-    
+    protected Dimension iconSize;
+
     /**
      * Creates a new framework tray view.
-     * 
-     * @param model The parent model
+     *
+     * @param parent The parent model
+     * @param model The model for this view
+     * @param trayIcon The tray icon to use
      * @param appName The application name
      */
-    public FrameworkTrayView(ParentModel model, String appName) {
+    public FrameworkTrayView(ParentModel parent, Model model, TrayIcon trayIcon, String appName) {
+        this.parent = parent;
         this.model = model;
+        this.trayIcon = trayIcon;
         this.appname = appName;
-        this.menu = new PopupMenu();
-        
-        if (!SystemTray.isSupported()) {
-            log.log(Level.SEVERE, "SystemTray is not supported");
-            throw new RuntimeException("SystemTray is not supported");
-        }
-        
-        this.tray = SystemTray.getSystemTray();
     }
-    
+
+    @Override
+    public void setName(String name) {
+        this.appname = name;
+    }
+
     /**
-     * Set the icon for this tray view.
-     * 
-     * @param icon The icon to use
+     * Get the icon size for this view.
+     */
+    public Dimension getIconSize() {
+        return iconSize;
+    }
+
+    /**
+     * Set the icon for this view.
      */
     public void setIcon(SmartIcon icon) {
         this.icon = icon;
-        trayIcon = new TrayIcon(icon.getIcon());
-        trayIcon.setPopupMenu(menu);
-        trayIcon.setToolTip(icon.getTooltip());
-        
-        try {
-            tray.add(trayIcon);
-        } catch (AWTException e) {
-            log.log(Level.SEVERE, "Failed to add tray icon", e);
-            throw new RuntimeException("Failed to add tray icon", e);
-        }
     }
-    
+
     /**
-     * Add an accent to the tray icon.
-     * 
-     * @param accent The accent to add
+     * Add an accent to the icon.
      */
     public void addAccent(PictureElement accent) {
-        if (icon != null) {
-            icon.addAccent(accent);
-            trayIcon.setImage(icon.getIcon());
-            trayIcon.setToolTip(icon.getTooltip());
-        }
+        // Default implementation does nothing
     }
-    
+
     /**
-     * Remove an accent from the tray icon.
-     * 
-     * @param accent The accent to remove
+     * Remove an accent from the icon.
      */
     public void removeAccent(PictureElement accent) {
-        if (icon != null) {
-            icon.removeAccent(accent);
-            trayIcon.setImage(icon.getIcon());
-            trayIcon.setToolTip(icon.getTooltip());
-        }
+        // Default implementation does nothing
     }
-    
+
     /**
-     * Get the popup menu for this tray view.
-     * 
-     * @return The popup menu
+     * Get the menu component for this view.
      */
-    public PopupMenu getMenu() {
-        return menu;
+    public MenuComponent getMenu() {
+        return null; // Subclasses should override
     }
-    
+
     /**
      * Display an error message.
-     * 
-     * @param message The error message
      */
     public void error(String message) {
         log.log(Level.SEVERE, message);
@@ -111,11 +90,9 @@ public class FrameworkTrayView implements View {
             trayIcon.displayMessage(appname, message, TrayIcon.MessageType.ERROR);
         }
     }
-    
+
     /**
      * Display an error message for an exception.
-     * 
-     * @param e The exception
      */
     public void error(Throwable e) {
         log.log(Level.SEVERE, e.getMessage(), e);
@@ -123,11 +100,9 @@ public class FrameworkTrayView implements View {
             trayIcon.displayMessage(appname, e.getMessage(), TrayIcon.MessageType.ERROR);
         }
     }
-    
+
     /**
      * Display an information message.
-     * 
-     * @param message The information message
      */
     public void info(String message) {
         log.log(Level.INFO, message);
@@ -135,11 +110,9 @@ public class FrameworkTrayView implements View {
             trayIcon.displayMessage(appname, message, TrayIcon.MessageType.INFO);
         }
     }
-    
+
     /**
      * Display a warning message.
-     * 
-     * @param message The warning message
      */
     public void warning(String message) {
         log.log(Level.WARNING, message);
@@ -147,11 +120,9 @@ public class FrameworkTrayView implements View {
             trayIcon.displayMessage(appname, message, TrayIcon.MessageType.WARNING);
         }
     }
-    
+
     /**
      * Display a warning message for an exception.
-     * 
-     * @param e The exception
      */
     public void warning(Throwable e) {
         log.log(Level.WARNING, e.getMessage(), e);
@@ -159,11 +130,9 @@ public class FrameworkTrayView implements View {
             trayIcon.displayMessage(appname, e.getMessage(), TrayIcon.MessageType.WARNING);
         }
     }
-    
+
     /**
      * Display a plain message.
-     * 
-     * @param message The message
      */
     public void none(String message) {
         log.log(Level.FINE, message);
@@ -171,19 +140,11 @@ public class FrameworkTrayView implements View {
             trayIcon.displayMessage(appname, message, TrayIcon.MessageType.NONE);
         }
     }
-    
-    @Override
-    public void setName(String name) {
-        this.appname = name;
-    }
-
-    @Override
-    public Dimension getIconSize() {
-        return null;
-    }
 
     @Override
     public void notifyMyParent() {
-        // Not needed in this implementation
+        if (parent != null) {
+            parent.childHasChanged(model);
+        }
     }
 }
