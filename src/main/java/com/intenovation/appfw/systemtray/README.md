@@ -12,10 +12,15 @@ A comprehensive framework for creating system tray applications with menus, back
 - **BackgroundTask:** Interface for long-running operations
 - **Progress/Status Callbacks:** Interfaces for reporting progress
 - **Builder Classes:** Convenience builders for menus and tasks
+- **FrameworkTrayView:** Integration with the application framework icon system
 
 ## Usage
 
 This package makes it easy to create system tray applications with rich context menus and background tasks that report progress. It supports cross-platform deployment and provides a clean API that hides UI framework complexities.
+
+It includes direct integration with the application framework's component model and icon system, allowing for dynamic updates to tray icons and messages.
+
+
 # Task Progress in System Tray Menu
 
 The framework now supports displaying task progress directly in the menu items. This provides users with immediate visibility into task status without needing to open the status dialog.
