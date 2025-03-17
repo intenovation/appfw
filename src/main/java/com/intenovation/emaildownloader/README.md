@@ -1,3 +1,27 @@
+# Email Downloader Package
+
+A complete IMAP email downloader that saves emails and attachments to a local file system.
+
+## Key Components
+
+- **ImapDownloader:** Main application entry point with configuration UI
+- **EmailDownloader:** Core email downloading functionality
+- **EmailCleanup:** Maintenance and organization of downloaded emails
+- **FileUtils:** File system utilities for email storage
+
+## Features
+
+- IMAP server connection with SSL/TLS support
+- Full and incremental email synchronization
+- Local storage with folder structure matching IMAP folders
+- Attachment extraction and storage
+- Duplicate detection and cleanup
+- Progress reporting and status updates
+
+## Usage
+
+This package provides a complete solution for downloading and organizing emails from IMAP servers. It's useful for email archiving, backup, and analysis.
+
 ## Key Features
 
 1. **Complete IMAP Integration**: Connects to any IMAP server using javax.mail to download emails

@@ -1,3 +1,21 @@
+# System Tray Package
+
+A comprehensive framework for creating system tray applications with menus, background tasks, and status reporting.
+
+## Key Components
+
+- **SystemTrayApp:** Main entry point for tray applications
+- **AppConfig:** Configuration interface for tray applications
+- **Action/MenuAction:** Interfaces for menu actions
+- **MenuCategory/MenuGroup:** Hierarchical menu structure
+- **Task:** Background task with progress reporting
+- **BackgroundTask:** Interface for long-running operations
+- **Progress/Status Callbacks:** Interfaces for reporting progress
+- **Builder Classes:** Convenience builders for menus and tasks
+
+## Usage
+
+This package makes it easy to create system tray applications with rich context menus and background tasks that report progress. It supports cross-platform deployment and provides a clean API that hides UI framework complexities.
 # Task Progress in System Tray Menu
 
 The framework now supports displaying task progress directly in the menu items. This provides users with immediate visibility into task status without needing to open the status dialog.
