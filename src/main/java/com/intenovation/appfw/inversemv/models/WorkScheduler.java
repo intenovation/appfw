@@ -31,7 +31,7 @@ public abstract class WorkScheduler implements ParentModel {
 	protected abstract String getBasicDisplayName();
 
 	/**
-	 * wird aufgerufen, wenn eine ausfŸhrung ansteht. Hier wird die arbeit
+	 * wird aufgerufen, wenn eine ausfauhrung ansteht. Hier wird die arbeit
 	 * zusammengesucht, jedesmal neu
 	 * 
 	 * @return
@@ -62,10 +62,10 @@ public abstract class WorkScheduler implements ParentModel {
 						if (running)
 							throw new RuntimeException("Already runing");
 						running = true;
-						// Steps wird nur einmal pro ausfŸhrung aufgerufen.
+						// Steps wird nur einmal pro ausfï¿½hrung aufgerufen.
 						// Wichtig ist eigentlich, dass nicht noch eine
-						// AusfŸhrung
-						// lŠuft
+						// Ausfï¿½hrung
+						// lï¿½uft
 						final List<Work> steps = getSteps();
 
 						if (steps == null || steps.size() == 0) {

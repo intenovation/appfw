@@ -105,9 +105,6 @@ public class SystemTrayApp {
      * @param model The parent model
      * @return A parent view that integrates with the system tray
      */
-    public static ParentView createFrameworkTrayView(ParentModel model) {
-        return new FrameworkParentTrayView(model);
-    }
 
 
     /**
@@ -116,9 +113,6 @@ public class SystemTrayApp {
      * @param model The parent model
      * @return A parent view that integrates with the system tray
      */
-    public static ParentView createFrameworkTrayView(ParentModel model) {
-        return FrameworkTrayFactory.createRootTrayView(model);
-    }
 
     /**
      * Create an appropriate view for a model based on its type.
