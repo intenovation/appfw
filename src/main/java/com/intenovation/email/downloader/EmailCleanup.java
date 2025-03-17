@@ -1,4 +1,4 @@
-package com.intenovation.emaildownloader;
+package com.intenovation.email.downloader;
 
 import java.io.File;
 import java.io.FileInputStream;

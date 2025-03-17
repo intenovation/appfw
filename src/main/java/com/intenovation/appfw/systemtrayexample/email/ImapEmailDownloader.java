@@ -6,7 +6,7 @@ import com.intenovation.appfw.systemtray.Task;
 import com.intenovation.appfw.systemtray.MenuCategory;
 import com.intenovation.appfw.systemtray.CategoryBuilder;
 import com.intenovation.appfw.systemtray.TaskBuilder;
-import com.intenovation.emaildownloader.FileUtils;
+import com.intenovation.email.downloader.FileUtils;
 
 import java.io.File;
 import java.io.FileOutputStream;

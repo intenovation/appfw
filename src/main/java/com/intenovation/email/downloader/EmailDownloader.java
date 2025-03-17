@@ -1,4 +1,4 @@
-package com.intenovation.emaildownloader;
+package com.intenovation.email.downloader;
 
 import javax.mail.*;
 import javax.mail.search.ComparisonTerm;

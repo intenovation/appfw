@@ -1,4 +1,4 @@
-package com.intenovation.emaildownloader;
+package com.intenovation.email.downloader;
 
 import java.io.File;
 import java.util.concurrent.atomic.AtomicInteger;

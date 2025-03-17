@@ -1,4 +1,4 @@
-package com.intenovation.emaildownloader;
+package com.intenovation.email.downloader;
 
 import com.intenovation.appfw.systemtray.SystemTrayApp;
 import com.intenovation.appfw.systemtray.AppConfig;
@@ -11,11 +11,7 @@ import javax.mail.*;
 import javax.swing.*;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
