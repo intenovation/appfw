@@ -124,10 +124,12 @@ public class FrameworkParentTrayView extends FrameworkTrayView implements Parent
         }
 
         // Add the child's menu item to this menu if applicable
-        MenuComponent menu1 = childView.getMenu();
-        if (menu1 != null) {
-            menu.add(menu1);
+        if (childView.getMenu() != null) {
+                        MenuComponent childMenu = childView.getMenu();
+                        if (childMenu instanceof MenuItem)
+                                menu.add((MenuItem)childMenu);
         }
+
 
         return childView;
     }
