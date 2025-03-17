@@ -91,16 +91,25 @@ public class EmailCleanup {
                             // Load properties
                             Properties props = new Properties();
                             props.load(new FileInputStream(propsFile));
-                            
-                            // Get message ID
-                            String messageId = props.getProperty("message.id");
+
+                            // Get message ID (prefer the folder version if available)
+                            String messageId = props.getProperty("message.id.folder");
+                            if (messageId == null || messageId.isEmpty()) {
+                                // Fall back to original message ID and sanitize it
+                                messageId = props.getProperty("message.id");
+                                if (messageId != null && !messageId.isEmpty()) {
+                                    messageId = FileUtils.sanitizeFileName(messageId);
+                                }
+                            }
+
                             if (messageId != null && !messageId.isEmpty()) {
                                 // Check if this is a duplicate
                                 if (messageIds.containsKey(messageId)) {
                                     File existingDir = messageIds.get(messageId);
-                                    
+
                                     // Only remove if different directories
                                     if (!existingDir.equals(messageDir)) {
+
                                         // Keep the newer message
                                         long existingTime = existingDir.lastModified();
                                         long currentTime = messageDir.lastModified();

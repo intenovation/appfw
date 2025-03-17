@@ -6,6 +6,7 @@ import com.intenovation.appfw.systemtray.Task;
 import com.intenovation.appfw.systemtray.MenuCategory;
 import com.intenovation.appfw.systemtray.CategoryBuilder;
 import com.intenovation.appfw.systemtray.TaskBuilder;
+import com.intenovation.emaildownloader.FileUtils;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -574,7 +575,14 @@ public class ImapEmailDownloader {
         File propsFile = new File(msgDir, "message.properties");
 
         Properties props = new Properties();
-        props.setProperty("message.id", msg.messageId);
+
+        // Message ID
+        String messageId =  msg.messageId;
+        if (messageId != null) {
+            props.setProperty("message.id", messageId);
+            // Also store the sanitized version that was used for the directory name
+            props.setProperty("message.id.folder", FileUtils.sanitizeFileName(messageId));
+        }
         props.setProperty("subject", msg.subject);
         props.setProperty("sender", msg.sender);
         props.setProperty("recipients", String.join(", ", msg.recipients));

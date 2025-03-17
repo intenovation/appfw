@@ -154,9 +154,9 @@ public class ImapDownloader {
         
         // Email operations category
         categories.add(new CategoryBuilder("Email Operations")
-            .addAction("Sync All Emails Now", ImapDownloader::syncAllEmailsNow)
+            //.addAction("Sync All Emails Now", ImapDownloader::syncAllEmailsNow)
             .addAction("Sync New Emails Only", ImapDownloader::syncNewEmailsNow)
-            .addAction("Clean Up Now", ImapDownloader::cleanupNow)
+           // .addAction("Clean Up Now", ImapDownloader::cleanupNow)
             .build());
         
         // Settings category

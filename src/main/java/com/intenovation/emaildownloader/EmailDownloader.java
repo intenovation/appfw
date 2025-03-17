@@ -451,6 +451,8 @@ public class EmailDownloader {
         String messageId = getMessageId(message);
         if (messageId != null) {
             props.setProperty("message.id", messageId);
+            // Also store the sanitized version that was used for the directory name
+            props.setProperty("message.id.folder", FileUtils.sanitizeFileName(messageId));
         }
 
         // Subject
