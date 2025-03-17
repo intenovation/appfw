@@ -5,9 +5,10 @@ public class Invoice {
 	String city;
 	String utility;
 	Type type=Type.Letter;
+
 	/*
-	Sender of the invoice
-	 */
+        Sender of the invoice
+         */
 	String email="";
 	double amount = 0.0;
 	String fileName = "";
@@ -21,6 +22,134 @@ public class Invoice {
 	String number = "";
 	String account = "";
 	String parse = "";
+
+	public String getEmailId() {
+		return emailId;
+	}
+
+	public void setEmailId(String emailId) {
+		this.emailId = emailId;
+	}
+
+	public String getCity() {
+		return city;
+	}
+
+	public void setCity(String city) {
+		this.city = city;
+	}
+
+	public String getUtility() {
+		return utility;
+	}
+
+	public void setUtility(String utility) {
+		this.utility = utility;
+	}
+
+	public Type getType() {
+		return type;
+	}
+
+	public void setType(Type type) {
+		this.type = type;
+	}
+
+	public String getEmail() {
+		return email;
+	}
+
+	public void setEmail(String email) {
+		this.email = email;
+	}
+
+	public double getAmount() {
+		return amount;
+	}
+
+	public void setAmount(double amount) {
+		this.amount = amount;
+	}
+
+	public String getFileName() {
+		return fileName;
+	}
+
+	public void setFileName(String fileName) {
+		this.fileName = fileName;
+	}
+
+	public String getSubject() {
+		return subject;
+	}
+
+	public void setSubject(String subject) {
+		this.subject = subject;
+	}
+
+	public int getYear() {
+		return year;
+	}
+
+	public void setYear(int year) {
+		this.year = year;
+	}
+
+	public int getMonth() {
+		return month;
+	}
+
+	public void setMonth(int month) {
+		this.month = month;
+	}
+
+	public int getDay() {
+		return day;
+	}
+
+	public void setDay(int day) {
+		this.day = day;
+	}
+
+	public String getDate() {
+		return date;
+	}
+
+	public void setDate(String date) {
+		this.date = date;
+	}
+
+	public String getDueDate() {
+		return dueDate;
+	}
+
+	public void setDueDate(String dueDate) {
+		this.dueDate = dueDate;
+	}
+
+	public String getNumber() {
+		return number;
+	}
+
+	public void setNumber(String number) {
+		this.number = number;
+	}
+
+	public String getAccount() {
+		return account;
+	}
+
+	public void setAccount(String account) {
+		this.account = account;
+	}
+
+	public String getParse() {
+		return parse;
+	}
+
+	public void setParse(String parse) {
+		this.parse = parse;
+	}
 
 	public static String header() {
 		return "ID\tYear\tMonth\tDay\tcity\tutility\ttype\temail\tDate\tDue Date\tSubject\tFile\tInvoice #\tAmount\tAccount\tParse\n";
