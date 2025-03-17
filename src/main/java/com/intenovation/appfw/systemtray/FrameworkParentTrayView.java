@@ -1,6 +1,11 @@
 package com.intenovation.appfw.systemtray;
 
-import java.awt.*;
+import java.awt.AWTException;
+import java.awt.Dimension;
+import java.awt.MenuItem;
+import java.awt.PopupMenu;
+import java.awt.SystemTray;
+import java.awt.TrayIcon;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.logging.Level;
@@ -17,33 +22,30 @@ import com.intenovation.appfw.inversemv.View;
  * A parent tray view that integrates with the system tray and provides
  * parent-child view relationships for the framework.
  */
-public class FrameworkParentTrayView implements ParentView {
+public class FrameworkParentTrayView extends FrameworkTrayView implements ParentView {
     private static final Logger log = Logger.getLogger(FrameworkParentTrayView.class.getName());
-    
+
     private SystemTray tray;
-    private TrayIcon trayIcon;
-    private String appname;
     private PopupMenu menu;
-    private SmartIcon icon;
-    private ParentModel model;
-    
+
     /**
      * Create a new parent tray view.
-     * 
+     *
      * @param model The parent model
      */
     public FrameworkParentTrayView(ParentModel model) {
+        super(null, model, null, model.getClass().getSimpleName());
         this.model = model;
         this.menu = new PopupMenu();
-        
+
         if (!SystemTray.isSupported()) {
             log.log(Level.SEVERE, "SystemTray is not supported");
             throw new RuntimeException("SystemTray is not supported");
         }
-        
+
         this.tray = SystemTray.getSystemTray();
     }
-    
+
     /**
      * Add exit and window options to the menu.
      */
@@ -52,27 +54,15 @@ public class FrameworkParentTrayView implements ParentView {
         exitItem.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 tray.remove(trayIcon);
-                getModel().stop();
+                ((Model)model).stop();
                 System.exit(0);
             }
         });
         getMenu().add(exitItem);
-        
+
         getMenu().addSeparator();
     }
-    
-    /**
-     * Get the model for this view.
-     */
-    public Model getModel() {
-        return model;
-    }
-    
-    @Override
-    public void setName(String name) {
-        this.appname = name;
-    }
-    
+
     @Override
     public Dimension getIconSize() {
         if (tray == null) {
@@ -81,23 +71,23 @@ public class FrameworkParentTrayView implements ParentView {
         }
         return tray.getTrayIconSize();
     }
-    
+
     @Override
     public void setIcon(SmartIcon icon) {
-        this.icon = icon;
+        super.setIcon(icon);
         trayIcon = new TrayIcon(icon.getIcon());
         trayIcon.setPopupMenu(menu);
         trayIcon.setToolTip(icon.getTooltip());
-        
+
         try {
             tray.add(trayIcon);
         } catch (AWTException e) {
             log.log(Level.SEVERE, "Failed to add tray icon", e);
         }
-        
+
         makeExit();
     }
-    
+
     @Override
     public void addAccent(PictureElement accent) {
         if (icon != null) {
@@ -106,7 +96,7 @@ public class FrameworkParentTrayView implements ParentView {
             trayIcon.setToolTip(icon.getTooltip());
         }
     }
-    
+
     @Override
     public void removeAccent(PictureElement accent) {
         if (icon != null) {
@@ -115,87 +105,41 @@ public class FrameworkParentTrayView implements ParentView {
             trayIcon.setToolTip(icon.getTooltip());
         }
     }
-    
-    /**
-     * Get the menu for this view.
-     */
+
+    @Override
     public PopupMenu getMenu() {
         return menu;
     }
-    
+
     @Override
     public View addChild(Model child) {
-        // Create a child view for the given model
-        FrameworkTrayView childView = new FrameworkTrayView((ParentModel)model, child, trayIcon, appname);
-        
-        // Add the child view's menu to this view's menu if applicable
-        if (childView instanceof FrameworkTrayView) {
-            MenuComponent childMenu = ((FrameworkTrayView) childView).getMenu();
-            if (childMenu != null) {
-                menu.add(childMenu);
-            }
+        // Determine the appropriate view type based on the model type
+        FrameworkTrayView childView;
+
+        if (child instanceof com.intenovation.appfw.inversemv.CheckboxModel) {
+            childView = new FrameworkCheckboxTrayView(this.model, child, trayIcon, appname);
+        } else if (child instanceof com.intenovation.appfw.inversemv.ActionModel) {
+            childView = new FrameworkActionTrayView(this.model, child, trayIcon, appname);
+        } else if (child instanceof ParentModel) {
+            childView = new FrameworkParentTrayView((ParentModel)child);
+            childView.trayIcon = this.trayIcon;
+            childView.appname = this.appname;
+        } else {
+            childView = new FrameworkTrayView(this.model, child, trayIcon, appname);
         }
-        
+
+        // Add the child's menu item to this menu if applicable
+        if (childView.getMenu() != null) {
+            menu.add(childView.getMenu());
+        }
+
         return childView;
     }
-    
+
     @Override
     public void removeChild(Model child) {
         // In a real implementation, this would remove the child's menu items
         // This is a simplified version
         log.info("Removing child: " + child);
-    }
-    
-    @Override
-    public void error(String message) {
-        log.log(Level.SEVERE, message);
-        if (trayIcon != null) {
-            trayIcon.displayMessage(appname, message, TrayIcon.MessageType.ERROR);
-        }
-    }
-    
-    @Override
-    public void error(Throwable e) {
-        log.log(Level.SEVERE, e.getMessage(), e);
-        if (trayIcon != null) {
-            trayIcon.displayMessage(appname, e.getMessage(), TrayIcon.MessageType.ERROR);
-        }
-    }
-    
-    @Override
-    public void info(String message) {
-        log.log(Level.INFO, message);
-        if (trayIcon != null) {
-            trayIcon.displayMessage(appname, message, TrayIcon.MessageType.INFO);
-        }
-    }
-    
-    @Override
-    public void warning(String message) {
-        log.log(Level.WARNING, message);
-        if (trayIcon != null) {
-            trayIcon.displayMessage(appname, message, TrayIcon.MessageType.WARNING);
-        }
-    }
-    
-    @Override
-    public void warning(Throwable e) {
-        log.log(Level.WARNING, e.getMessage(), e);
-        if (trayIcon != null) {
-            trayIcon.displayMessage(appname, e.getMessage(), TrayIcon.MessageType.WARNING);
-        }
-    }
-    
-    @Override
-    public void none(String message) {
-        log.log(Level.FINE, message);
-        if (trayIcon != null) {
-            trayIcon.displayMessage(appname, message, TrayIcon.MessageType.NONE);
-        }
-    }
-    
-    @Override
-    public void notifyMyParent() {
-        // As the root, there's no parent to notify
     }
 }

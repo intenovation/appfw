@@ -13,7 +13,7 @@ import com.intenovation.appfw.inversemv.ParentModel;
 import com.intenovation.appfw.inversemv.View;
 
 /**
- * Framework-specific tray view implementation that integrates with the
+ * Base class for framework-specific tray views that integrate with the
  * intenovation application framework components.
  */
 public class FrameworkTrayView implements View {
@@ -144,7 +144,12 @@ public class FrameworkTrayView implements View {
     @Override
     public void notifyMyParent() {
         if (parent != null) {
+            com.intenovation.appfw.icon.Achtung achtung = new com.intenovation.appfw.icon.Achtung("Notification");
+            addAccent(achtung);
+            parent.getView().addAccent(achtung);
             parent.childHasChanged(model);
+            removeAccent(achtung);
+            parent.getView().removeAccent(achtung);
         }
     }
 }

@@ -108,4 +108,27 @@ public class SystemTrayApp {
     public static ParentView createFrameworkTrayView(ParentModel model) {
         return new FrameworkParentTrayView(model);
     }
+
+
+    /**
+     * Create a framework-compatible root tray view for integration with the inversemv framework.
+     *
+     * @param model The parent model
+     * @return A parent view that integrates with the system tray
+     */
+    public static ParentView createFrameworkTrayView(ParentModel model) {
+        return FrameworkTrayFactory.createRootTrayView(model);
+    }
+
+    /**
+     * Create an appropriate view for a model based on its type.
+     *
+     * @param parent The parent model
+     * @param model The model to create a view for
+     * @param appName The application name
+     * @return A view appropriate for the model type
+     */
+    public static View createViewForModel(ParentModel parent, Model model, String appName) {
+        return FrameworkTrayFactory.createViewForModel(parent, model, appName);
+    }
 }
