@@ -5,7 +5,7 @@ import java.awt.MenuComponent;
 
 /**
  * Dieses Modell kennt im gegensatz zum Klassischen MVC seine View.
- * Dafür kennt die View das Modell nicht :)
+ * Dafuer kennt die View das Modell nicht :)
  * @author jens
  *
  */

@@ -54,7 +54,7 @@ public class SmartIcon {
 	}
 
 	private void drawImage() {
-		Assert.notNull(size, "keine grš§e");
+		Assert.notNull(size, "keine groesse");
 		image = new BufferedImage(size.width, size.height,
 				BufferedImage.TYPE_INT_ARGB);
 

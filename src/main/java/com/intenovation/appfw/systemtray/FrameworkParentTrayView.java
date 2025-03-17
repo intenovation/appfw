@@ -1,11 +1,6 @@
 package com.intenovation.appfw.systemtray;
 
-import java.awt.AWTException;
-import java.awt.Dimension;
-import java.awt.MenuItem;
-import java.awt.PopupMenu;
-import java.awt.SystemTray;
-import java.awt.TrayIcon;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.logging.Level;
@@ -117,20 +112,21 @@ public class FrameworkParentTrayView extends FrameworkTrayView implements Parent
         FrameworkTrayView childView;
 
         if (child instanceof com.intenovation.appfw.inversemv.CheckboxModel) {
-            childView = new FrameworkCheckboxTrayView(this.model, child, trayIcon, appname);
+            childView = new FrameworkCheckboxTrayView((ParentModel) this.model, child, trayIcon, appname);
         } else if (child instanceof com.intenovation.appfw.inversemv.ActionModel) {
-            childView = new FrameworkActionTrayView(this.model, child, trayIcon, appname);
+            childView = new FrameworkActionTrayView((ParentModel)this.model, child, trayIcon, appname);
         } else if (child instanceof ParentModel) {
             childView = new FrameworkParentTrayView((ParentModel)child);
             childView.trayIcon = this.trayIcon;
             childView.appname = this.appname;
         } else {
-            childView = new FrameworkTrayView(this.model, child, trayIcon, appname);
+            childView = new FrameworkTrayView((ParentModel)this.model, child, trayIcon, appname);
         }
 
         // Add the child's menu item to this menu if applicable
-        if (childView.getMenu() != null) {
-            menu.add(childView.getMenu());
+        MenuComponent menu1 = childView.getMenu();
+        if (menu1 != null) {
+            menu.add(menu1);
         }
 
         return childView;

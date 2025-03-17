@@ -14,7 +14,7 @@ public class Point implements PictureElement {
 	}
 
 	/**
-	 * kopiert einen anderen Punkt, um ihn anschlie§end relativ zu verschieben.
+	 * kopiert einen anderen Punkt, um ihn anschliessend relativ zu verschieben.
 	 * 
 	 * @param vorlage
 	 */

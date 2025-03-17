@@ -16,8 +16,8 @@ public interface View {
 	void setName(String name);
 
 	/**
-	 * wenn das Modell ein Icon Anzeigen wollte, welche größe müsste es haben?
-	 * Wenn null, dann ist es nicht möglich, ein Icon anzuzeigen
+	 * wenn das Modell ein Icon Anzeigen wollte, welche groesse muesste es haben?
+	 * Wenn null, dann ist es nicht moeglich, ein Icon anzuzeigen
 	 * 
 	 * @return
 	 */
