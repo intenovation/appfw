@@ -1,0 +1,11 @@
+password manager
+svn manager
+truecrypt managers
+scandup
+archiver
+adressmanager  
+ldap server
+mail sorter
+mail archiver
+mail notifier
+mp3 itunes sync (itunes nutzt plists....)
