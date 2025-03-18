@@ -62,18 +62,20 @@ class LocalFolder extends Folder {
 
     @Override
     public Folder[] list(String pattern) throws MessagingException {
-        File[] subdirs = directory.listFiles(File::isDirectory);
+        // Only list directories that don't have message.properties (actual folders, not messages)
+        File[] subdirs = directory.listFiles(file ->
+                file.isDirectory() &&
+                        !file.getName().startsWith(".") &&
+                        !file.getName().equals("attachments") &&
+                        !new File(file, "message.properties").exists()
+        );
+
         if (subdirs == null) {
             return new Folder[0];
         }
 
         List<Folder> folders = new ArrayList<>();
         for (File subdir : subdirs) {
-            // Skip hidden directories and non-folder directories
-            if (subdir.getName().startsWith(".") || subdir.getName().equals("attachments")) {
-                continue;
-            }
-
             String subfolder = folderName != null ? folderName + "/" + subdir.getName() : subdir.getName();
             folders.add(new LocalFolder((LocalStore) store, subfolder, subdir));
         }
@@ -162,24 +164,22 @@ class LocalFolder extends Folder {
         this.mode = mode;
         this.isOpen = true;
 
-        // Load messages
-        File[] messageDirs = directory.listFiles(File::isDirectory);
+        // Load messages - only directories with message.properties are considered messages
+        File[] messageDirs = directory.listFiles(file ->
+                file.isDirectory() &&
+                        !file.getName().startsWith(".") &&
+                        !file.getName().equals("attachments") &&
+                        new File(file, "message.properties").exists()
+        );
+
         if (messageDirs != null) {
             for (File messageDir : messageDirs) {
-                // Skip hidden directories or non-message directories
-                if (messageDir.getName().startsWith(".") || messageDir.getName().equals("attachments")) {
-                    continue;
-                }
-
-                File propertiesFile = new File(messageDir, "message.properties");
-                if (propertiesFile.exists()) {
-                    try {
-                        LocalMessage message = new LocalMessage(this, messageDir);
-                        messages.add(message);
-                    } catch (Exception e) {
-                        // Log error but continue with other messages
-                        System.err.println("Error loading message: " + e.getMessage());
-                    }
+                try {
+                    LocalMessage message = new LocalMessage(this, messageDir);
+                    messages.add(message);
+                } catch (Exception e) {
+                    // Log error but continue with other messages
+                    System.err.println("Error loading message: " + e.getMessage());
                 }
             }
         }
@@ -217,18 +217,15 @@ class LocalFolder extends Folder {
     @Override
     public int getMessageCount() throws MessagingException {
         if (!isOpen) {
-            File[] messageDirs = directory.listFiles(File::isDirectory);
-            if (messageDirs == null) {
-                return 0;
-            }
+            // Count only directories with message.properties
+            File[] messageDirs = directory.listFiles(file ->
+                    file.isDirectory() &&
+                            !file.getName().startsWith(".") &&
+                            !file.getName().equals("attachments") &&
+                            new File(file, "message.properties").exists()
+            );
 
-            int count = 0;
-            for (File dir : messageDirs) {
-                if (!dir.getName().startsWith(".") && !dir.getName().equals("attachments")) {
-                    count++;
-                }
-            }
-            return count;
+            return messageDirs != null ? messageDirs.length : 0;
         }
 
         return messages.size();
