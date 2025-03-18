@@ -61,7 +61,7 @@ public class InvoiceProcessor extends AbstractBackgroundTask {
 
         try {
             // Step 1: Open the local mail store
-            callback.update(5, "Opening local mail store...");
+            callback.update(5, "Opening local mail store "+emailDirectory);
 
             store = LocalMail.openStore(emailDirectory);
             callback.update(5, "Connected to local email store");
