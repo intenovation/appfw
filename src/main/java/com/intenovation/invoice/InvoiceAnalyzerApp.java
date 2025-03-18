@@ -140,7 +140,12 @@ public class InvoiceAnalyzerApp {
             .withDescription("Analyzes emails to extract invoice information")
             .withIntervalSeconds(processor.getIntervalSeconds())
             .showInMenu(true)
-            .withExecutor(processor::execute);
+                .withExecutor((progressConsumer, statusConsumer) ->
+                processor.execute(
+                        percent -> progressConsumer.accept(percent),  // Convert Consumer to ProgressCallback
+                        message -> statusConsumer.accept(message)     // Convert Consumer to StatusCallback
+                )
+        );
         
         tasks.add(taskBuilder.build());
         
