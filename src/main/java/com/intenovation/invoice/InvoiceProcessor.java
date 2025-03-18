@@ -107,6 +107,9 @@ public class InvoiceProcessor extends AbstractBackgroundTask {
                             if (isPotentialInvoice(message)) {
                                 potentialInvoiceMessages.add(message);
                             }
+                            else {
+                                LOGGER.log(Level.FINE, "Rejecting message", message);
+                            }
                         } catch (Exception e) {
                             LOGGER.log(Level.WARNING, "Error checking message", e);
                         }

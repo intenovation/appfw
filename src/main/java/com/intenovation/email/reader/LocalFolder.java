@@ -267,6 +267,35 @@ class LocalFolder extends Folder {
             throw new IllegalStateException("Folder is not open");
         }
 
+        // If we've already loaded the messages, just return them
+        if (!messages.isEmpty()) {
+            return messages.toArray(new Message[0]);
+        }
+
+        // If messages list is empty, reload the messages from the directory
+        // This can happen if folder was opened but messages weren't loaded properly
+        File[] messageDirs = directory.listFiles(file ->
+                file.isDirectory() &&
+                        !file.getName().startsWith(".") &&
+                        !file.getName().equals("attachments") &&
+                        new File(file, "message.properties").exists()
+        );
+
+        if (messageDirs != null) {
+            for (File messageDir : messageDirs) {
+                try {
+                    LocalMessage message = new LocalMessage(this, messageDir);
+                    messages.add(message);
+                } catch (Exception e) {
+                    // Log the error but continue with other messages
+                    System.err.println("Error loading message from " + messageDir.getPath() + ": " + e.getMessage());
+                }
+            }
+
+            // Sort messages by date if possible
+            messages.sort(Comparator.comparing(LocalMessage::getReceivedDate, Comparator.nullsLast(Comparator.naturalOrder())));
+        }
+
         return messages.toArray(new Message[0]);
     }
 
