@@ -5,14 +5,13 @@ package com.intenovation.appfw.systemtray;
  */
 public interface BackgroundTask {
     /**
-     * Execute the task with progress reporting
+     * Execute the task with progress and status reporting
      *
-     * @param progressCallback Callback to report progress (0-100)
-     * @param statusCallback   Callback to report status message
+     * @param callback Callback for reporting progress and status messages
      * @return Optional status message that can be displayed on completion
      * @throws InterruptedException if the task is cancelled
      */
-    String execute(ProgressCallback progressCallback, StatusCallback statusCallback) throws InterruptedException;
+    String execute(ProgressStatusCallback callback) throws InterruptedException;
 
     /**
      * Get the interval in seconds to execute this task if scheduled

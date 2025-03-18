@@ -1,8 +1,4 @@
-
-// File: TaskBuilder.java
 package com.intenovation.appfw.systemtray;
-
-import java.util.function.Consumer;
 
 /**
  * Builder for creating tasks
@@ -13,16 +9,15 @@ public class TaskBuilder {
     private int intervalSeconds;
     private boolean showInMenu;
     private TaskExecutor executor;
-    
+
     /**
      * Functional interface for task execution
      */
     @FunctionalInterface
     public interface TaskExecutor {
-        String execute(Consumer<Integer> progressUpdater, Consumer<String> statusUpdater) 
-                throws InterruptedException;
+        String execute(ProgressStatusCallback callback) throws InterruptedException;
     }
-    
+
     /**
      * Create a new task builder
      * @param name The task name
@@ -30,7 +25,7 @@ public class TaskBuilder {
     public TaskBuilder(String name) {
         this.name = name;
     }
-    
+
     /**
      * Set the task description
      * @param description The description
@@ -40,7 +35,7 @@ public class TaskBuilder {
         this.description = description;
         return this;
     }
-    
+
     /**
      * Set the task interval in seconds
      * @param intervalSeconds The interval (0 for manual only)
@@ -50,7 +45,7 @@ public class TaskBuilder {
         this.intervalSeconds = intervalSeconds;
         return this;
     }
-    
+
     /**
      * Set whether the task should show in the menu
      * @param showInMenu true to show in menu
@@ -60,7 +55,7 @@ public class TaskBuilder {
         this.showInMenu = showInMenu;
         return this;
     }
-    
+
     /**
      * Set the task executor
      * @param executor The executor
@@ -70,7 +65,7 @@ public class TaskBuilder {
         this.executor = executor;
         return this;
     }
-    
+
     /**
      * Build the task
      * @return The task

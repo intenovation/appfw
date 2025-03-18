@@ -1,8 +1,4 @@
-
-// File: SimpleTask.java
 package com.intenovation.appfw.systemtray;
-
-import java.util.function.Consumer;
 
 /**
  * Simple implementation of the Task interface
@@ -13,7 +9,7 @@ public class SimpleTask implements Task {
     private final int intervalSeconds;
     private final boolean showInMenu;
     private final TaskBuilder.TaskExecutor executor;
-    
+
     /**
      * Create a new simple task
      * @param name The task name
@@ -22,40 +18,39 @@ public class SimpleTask implements Task {
      * @param showInMenu Whether to show in menu
      * @param executor The task executor
      */
-    public SimpleTask(String name, String description, int intervalSeconds, 
-                     boolean showInMenu, TaskBuilder.TaskExecutor executor) {
+    public SimpleTask(String name, String description, int intervalSeconds,
+                      boolean showInMenu, TaskBuilder.TaskExecutor executor) {
         this.name = name;
         this.description = description;
         this.intervalSeconds = intervalSeconds;
         this.showInMenu = showInMenu;
         this.executor = executor;
     }
-    
+
     @Override
     public String getName() {
         return name;
     }
-    
+
     @Override
     public String getDescription() {
         return description;
     }
-    
+
     @Override
     public int getIntervalSeconds() {
         return intervalSeconds;
     }
-    
+
     @Override
     public boolean showInMenu() {
         return showInMenu;
     }
-    
+
     @Override
-    public String execute(Consumer<Integer> progressUpdater, Consumer<String> statusUpdater) 
-            throws InterruptedException {
+    public String execute(ProgressStatusCallback callback) throws InterruptedException {
         if (executor != null) {
-            return executor.execute(progressUpdater, statusUpdater);
+            return executor.execute(callback);
         }
         return "Task completed (no executor defined)";
     }

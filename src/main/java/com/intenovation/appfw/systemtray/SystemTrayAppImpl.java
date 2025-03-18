@@ -1,4 +1,3 @@
-// File: SystemTrayAppImpl.java
 package com.intenovation.appfw.systemtray;
 
 import java.awt.AWTException;
@@ -37,7 +36,7 @@ import javax.swing.border.EmptyBorder;
  */
 public class SystemTrayAppImpl {
     private static final Logger LOGGER = Logger.getLogger(SystemTrayAppImpl.class.getName());
-    
+
     private final AppConfig config;
     private final TrayIcon trayIcon;
     private final ScheduledExecutorService scheduledExecutor;
@@ -52,7 +51,7 @@ public class SystemTrayAppImpl {
     private final ConcurrentHashMap<String, JLabel> statusLabels = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, JButton> startButtons = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, JButton> cancelButtons = new ConcurrentHashMap<>();
-    
+
     /**
      * Create a new system tray application
      * @param config Application configuration
@@ -60,91 +59,91 @@ public class SystemTrayAppImpl {
      * @param tasks Background tasks
      * @throws AWTException if the system tray is not supported
      */
-    public SystemTrayAppImpl(AppConfig config, List<MenuCategory> menuCategories, List<Task> tasks) 
+    public SystemTrayAppImpl(AppConfig config, List<MenuCategory> menuCategories, List<Task> tasks)
             throws AWTException {
         this.config = config;
-        
+
         if (!SystemTray.isSupported()) {
             throw new AWTException("System tray not supported on this platform");
         }
-        
+
         // Store tasks by name
         for (Task task : tasks) {
             tasksByName.put(task.getName(), task);
         }
-        
+
         // Initialize executors
         this.scheduledExecutor = Executors.newScheduledThreadPool(Math.max(1, tasks.size()));
         this.taskExecutor = Executors.newCachedThreadPool();
-        
+
         // Create popup menu
         PopupMenu popup = new PopupMenu();
-        
+
         // Add menu categories
         for (MenuCategory category : menuCategories) {
             addMenuCategory(popup, category);
         }
-        
+
         // Add tasks menu if needed
         boolean hasMenuTasks = tasks.stream().anyMatch(Task::showInMenu);
         if (hasMenuTasks) {
             popup.addSeparator();
             PopupMenu tasksMenu = new PopupMenu("Tasks");
-            
+
             for (Task task : tasks) {
                 if (task.showInMenu()) {
                     String taskName = task.getName();
                     MenuItem taskItem = new MenuItem(taskName);
                     taskItem.addActionListener(e -> startTask(taskName));
                     tasksMenu.add(taskItem);
-                    
+
                     taskMenuItems.put(taskName, taskItem);
                     taskStatuses.put(taskName, new TaskStatus());
                 }
             }
-            
+
             popup.add(tasksMenu);
         }
-        
+
         // Add task status menu item
         MenuItem statusItem = new MenuItem("Task Status");
         statusItem.addActionListener(e -> showTaskStatusDialog());
         popup.add(statusItem);
-        
+
         // Add exit menu item
         popup.addSeparator();
         MenuItem exitItem = new MenuItem("Exit");
         exitItem.addActionListener(e -> exit());
         popup.add(exitItem);
-        
+
         // Create tray icon
         Image image = new ImageIcon(getClass().getResource(config.getIconPath())).getImage();
         trayIcon = new TrayIcon(image, config.getAppName(), popup);
         trayIcon.setImageAutoSize(true);
-        
+
         // Set default action
         trayIcon.addActionListener(e -> config.onIconDoubleClick());
-        
+
         // Add icon to system tray
         SystemTray.getSystemTray().add(trayIcon);
-        
+
         // Schedule tasks
         for (Task task : tasks) {
             int interval = task.getIntervalSeconds();
             if (interval > 0) {
                 TaskStatus status = taskStatuses.computeIfAbsent(task.getName(), k -> new TaskStatus());
-                
+
                 ScheduledFuture<?> future = scheduledExecutor.scheduleAtFixedRate(() -> {
                     if (!status.isRunning()) {
                         startTask(task.getName());
                     }
                 }, 0, interval, TimeUnit.SECONDS);
-                
+
                 scheduledTasks.put(task.getName(), future);
             }
         }
     }
-    
+
     /**
      * Add a menu category to a popup menu
      * @param parent The parent menu
@@ -152,22 +151,22 @@ public class SystemTrayAppImpl {
      */
     private void addMenuCategory(PopupMenu parent, MenuCategory category) {
         PopupMenu submenu = new PopupMenu(category.getLabel());
-        
+
         // Add actions
         for (Action action : category.getActions()) {
             MenuItem item = new MenuItem(action.getLabel());
             item.addActionListener(e -> action.execute());
             submenu.add(item);
         }
-        
+
         // Add subcategories
         for (MenuCategory subcategory : category.getSubcategories()) {
             addMenuCategory(submenu, subcategory);
         }
-        
+
         parent.add(submenu);
     }
-    
+
     /**
      * Start a task
      * @param taskName The name of the task to start
@@ -178,56 +177,54 @@ public class SystemTrayAppImpl {
             LOGGER.warning("Task not found: " + taskName);
             return;
         }
-        
+
         TaskStatus status = taskStatuses.computeIfAbsent(taskName, k -> new TaskStatus());
-        
+
         // Don't start if already running
         if (status.isRunning()) {
             trayIcon.displayMessage(taskName, "Task already running", TrayIcon.MessageType.INFO);
             return;
         }
-        
+
         LOGGER.info("Starting task: " + taskName);
-        
+
         // Update status
         status.setProgress(0);
         status.setStatus("Starting...");
         status.setRunning(true);
-        
+
         // Update menu item
         updateTaskMenuLabel(taskName, 0, true);
-        
+
         // Update UI components in status dialog if it's open
         updateStatusDialogComponents(taskName, 0, "Starting...", true);
-        
+
         // Start task in executor
         Future<?> future = taskExecutor.submit(() -> {
             try {
-                String result = task.execute(
-                    // Progress callback
-                    progress -> {
+                // Create a progress/status callback that updates the UI
+                ProgressStatusCallback callback = new ProgressStatusCallback() {
+                    @Override
+                    public void update(int percent, String message) {
                         SwingUtilities.invokeLater(() -> {
-                            status.setProgress(progress);
-                            updateTaskMenuLabel(taskName, progress, true);
-                            updateStatusDialogComponents(taskName, progress, status.getStatus(), true);
-                        });
-                    },
-                    // Status callback
-                    message -> {
-                        SwingUtilities.invokeLater(() -> {
+                            status.setProgress(percent);
                             status.setStatus(message);
-                            updateStatusDialogComponents(taskName, status.getProgress(), message, true);
+                            updateTaskMenuLabel(taskName, percent, true);
+                            updateStatusDialogComponents(taskName, percent, message, true);
                         });
                     }
-                );
-                
+                };
+
+                // Execute the task with our combined callback
+                String result = task.execute(callback);
+
                 SwingUtilities.invokeLater(() -> {
                     status.setProgress(100);
                     status.setStatus("Completed");
                     status.setRunning(false);
                     updateTaskMenuLabel(taskName, 100, false);
                     updateStatusDialogComponents(taskName, 100, "Completed", false);
-                    
+
                     if (result != null && !result.isEmpty()) {
                         trayIcon.displayMessage(taskName, result, TrayIcon.MessageType.INFO);
                     }
@@ -242,23 +239,23 @@ public class SystemTrayAppImpl {
                 });
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "Error in task: " + taskName, e);
-                
+
                 SwingUtilities.invokeLater(() -> {
                     status.setStatus("Error: " + e.getMessage());
                     status.setRunning(false);
                     updateTaskMenuLabel(taskName, 0, false);
                     updateStatusDialogComponents(taskName, 0, "Error: " + e.getMessage(), false);
-                    trayIcon.displayMessage(taskName, 
-                                         "Error: " + e.getMessage(), 
-                                         TrayIcon.MessageType.ERROR);
+                    trayIcon.displayMessage(taskName,
+                            "Error: " + e.getMessage(),
+                            TrayIcon.MessageType.ERROR);
                 });
             }
         });
-        
+
         // Store future for cancellation
         runningTasks.put(taskName, future);
     }
-    
+
     /**
      * Update a task menu item's label with progress
      * @param taskName The task name
@@ -277,7 +274,7 @@ public class SystemTrayAppImpl {
             });
         }
     }
-    
+
     /**
      * Update UI components in the status dialog for a task
      * @param taskName The task name
@@ -289,31 +286,31 @@ public class SystemTrayAppImpl {
         if (statusDialog == null || !statusDialog.isVisible()) {
             return;
         }
-        
+
         SwingUtilities.invokeLater(() -> {
             JProgressBar progressBar = progressBars.get(taskName);
             JLabel statusLabel = statusLabels.get(taskName);
             JButton startButton = startButtons.get(taskName);
             JButton cancelButton = cancelButtons.get(taskName);
-            
+
             if (progressBar != null) {
                 progressBar.setValue(progress);
             }
-            
+
             if (statusLabel != null) {
                 statusLabel.setText(statusText);
             }
-            
+
             if (startButton != null) {
                 startButton.setEnabled(!running);
             }
-            
+
             if (cancelButton != null) {
                 cancelButton.setEnabled(running);
             }
         });
     }
-    
+
     /**
      * Cancel a running task
      * @param taskName The name of the task to cancel
@@ -334,7 +331,7 @@ public class SystemTrayAppImpl {
         }
         return false;
     }
-    
+
     /**
      * Show a dialog with task statuses
      */
@@ -344,35 +341,35 @@ public class SystemTrayAppImpl {
             statusDialog.toFront();
             return;
         }
-        
+
         SwingUtilities.invokeLater(() -> {
             statusDialog = new JDialog((Frame) null, "Task Status", false);
             statusDialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
-            
+
             JPanel content = new JPanel();
             content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
             content.setBorder(new EmptyBorder(10, 10, 10, 10));
-            
+
             // Clear previous component references
             progressBars.clear();
             statusLabels.clear();
             startButtons.clear();
             cancelButtons.clear();
-            
+
             boolean hasAnyTasks = false;
-            
+
             for (Map.Entry<String, Task> entry : tasksByName.entrySet()) {
                 String taskName = entry.getKey();
                 Task task = entry.getValue();
                 TaskStatus status = taskStatuses.get(taskName);
-                
+
                 if (status != null) {
                     hasAnyTasks = true;
-                    
+
                     JPanel taskPanel = new JPanel();
                     taskPanel.setLayout(new BorderLayout(5, 5));
                     taskPanel.setBorder(new EmptyBorder(5, 0, 10, 0));
-                    
+
                     // Task name and description
                     JPanel headerPanel = new JPanel(new BorderLayout());
                     JLabel nameLabel = new JLabel(taskName);
