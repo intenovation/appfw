@@ -380,7 +380,7 @@ public class InvoiceProcessor extends AbstractBackgroundTask {
         String timestamp = sdf.format(new Date());
 
         // CSV file for all invoices
-        File csvFile = new File(outputDirectory, "invoices_" + timestamp + ".csv");
+        File csvFile = new File(outputDirectory, "invoices_" + timestamp + ".tsv");
 
         try (FileWriter writer = new FileWriter(csvFile)) {
             // Write header
