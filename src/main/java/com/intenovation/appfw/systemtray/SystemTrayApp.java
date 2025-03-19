@@ -2,7 +2,6 @@
 package com.intenovation.appfw.systemtray;
 
 import com.intenovation.appfw.systemtray.*;
-import com.intenovation.appfw.inversemv.*;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -99,30 +98,5 @@ public class SystemTrayApp {
     public static boolean openDirectory(File directory) {
         return UIHelper.openDirectory(directory);
     }
-    /**
-     * Create a framework-compatible tray view for integration with the inversemv framework.
-     *
-     * @param model The parent model
-     * @return A parent view that integrates with the system tray
-     */
 
-
-    /**
-     * Create a framework-compatible root tray view for integration with the inversemv framework.
-     *
-     * @param model The parent model
-     * @return A parent view that integrates with the system tray
-     */
-
-    /**
-     * Create an appropriate view for a model based on its type.
-     *
-     * @param parent The parent model
-     * @param model The model to create a view for
-     * @param appName The application name
-     * @return A view appropriate for the model type
-     */
-    public static View createViewForModel(ParentModel parent, Model model, String appName) {
-        return FrameworkTrayFactory.createViewForModel(parent, model, appName);
-    }
 }
