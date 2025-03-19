@@ -70,7 +70,7 @@ public class TaskBuilder {
      * Build the task
      * @return The task
      */
-    public Task build() {
+    public BackgroundTask build() {
         return new SimpleTask(name, description, intervalSeconds, showInMenu, executor);
     }
 }

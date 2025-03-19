@@ -22,7 +22,7 @@ public class SystemTrayApp {
      * @param tasks Background tasks
      * @throws RuntimeException if the system tray is not supported
      */
-    public SystemTrayApp(AppConfig config, List<MenuCategory> menuCategories, List<Task> tasks) {
+    public SystemTrayApp(AppConfig config, List<MenuCategory> menuCategories, List<BackgroundTask> tasks) {
         try {
             implementation = new SystemTrayAppImpl(config, menuCategories, tasks);
             LOGGER.info("System tray application started successfully");

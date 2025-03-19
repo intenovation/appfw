@@ -1,13 +1,13 @@
 package com.intenovation.appfw.systemtray;
 
 /**
- * Simple implementation of the Task interface
+ * Simple implementation of the BackgroundTask interface
  */
-public class SimpleTask implements Task {
+public class SimpleTask implements BackgroundTask {
     private final String name;
     private final String description;
     private final int intervalSeconds;
-    private final boolean showInMenu;
+    private final boolean availableInMenu;
     private final TaskBuilder.TaskExecutor executor;
 
     /**
@@ -15,15 +15,15 @@ public class SimpleTask implements Task {
      * @param name The task name
      * @param description The task description
      * @param intervalSeconds The interval in seconds
-     * @param showInMenu Whether to show in menu
+     * @param availableInMenu Whether to show in menu
      * @param executor The task executor
      */
     public SimpleTask(String name, String description, int intervalSeconds,
-                      boolean showInMenu, TaskBuilder.TaskExecutor executor) {
+                      boolean availableInMenu, TaskBuilder.TaskExecutor executor) {
         this.name = name;
         this.description = description;
         this.intervalSeconds = intervalSeconds;
-        this.showInMenu = showInMenu;
+        this.availableInMenu = availableInMenu;
         this.executor = executor;
     }
 
@@ -43,8 +43,8 @@ public class SimpleTask implements Task {
     }
 
     @Override
-    public boolean showInMenu() {
-        return showInMenu;
+    public boolean isAvailableInMenu() {
+        return availableInMenu;
     }
 
     @Override

@@ -75,7 +75,7 @@ public class ImapDownloader {
             List<MenuCategory> menuCategories = createMenuCategories();
 
             // Create background tasks
-            List<Task> tasks = createTasks();
+            List<BackgroundTask> tasks = createTasks();
 
             // Initialize the system tray application
             systemTrayApp = new SystemTrayApp(appConfig, menuCategories, tasks);
@@ -172,8 +172,12 @@ public class ImapDownloader {
      * Create the background tasks for the application
      * @return The tasks
      */
-    private static List<Task> createTasks() {
-        List<Task> tasks = new ArrayList<>();
+    /**
+     * Create the background tasks for the application
+     * @return The tasks
+     */
+    private static List<BackgroundTask> createTasks() {
+        List<BackgroundTask> tasks = new ArrayList<>();
 
         // Full email sync task
         tasks.add(new TaskBuilder("Full Email Sync")

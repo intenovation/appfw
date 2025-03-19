@@ -20,7 +20,7 @@ public class SystemTrayAppImpl {
     private final TrayIcon trayIcon;
     private final ScheduledExecutorService scheduledExecutor;
     private final ExecutorService taskExecutor;
-    private final Map<String, Task> tasksByName = new HashMap<>();
+    private final Map<String, BackgroundTask> tasksByName = new HashMap<>();
     private final ConcurrentHashMap<String, TaskStatus> taskStatuses = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Future<?>> runningTasks = new ConcurrentHashMap<>();
@@ -38,7 +38,7 @@ public class SystemTrayAppImpl {
      * @param tasks Background tasks
      * @throws AWTException if the system tray is not supported
      */
-    public SystemTrayAppImpl(AppConfig config, List<MenuCategory> menuCategories, List<Task> tasks)
+    public SystemTrayAppImpl(AppConfig config, List<MenuCategory> menuCategories, List<BackgroundTask> tasks)
             throws AWTException {
         this.config = config;
 
@@ -47,7 +47,7 @@ public class SystemTrayAppImpl {
         }
 
         // Store tasks by name
-        for (Task task : tasks) {
+        for (BackgroundTask task : tasks) {
             tasksByName.put(task.getName(), task);
         }
 
@@ -64,13 +64,13 @@ public class SystemTrayAppImpl {
         }
 
         // Add tasks menu if needed
-        boolean hasMenuTasks = tasks.stream().anyMatch(Task::showInMenu);
+        boolean hasMenuTasks = tasks.stream().anyMatch(BackgroundTask::isAvailableInMenu);
         if (hasMenuTasks) {
             popup.addSeparator();
             PopupMenu tasksMenu = new PopupMenu("Tasks");
 
-            for (Task task : tasks) {
-                if (task.showInMenu()) {
+            for (BackgroundTask task : tasks) {
+                if (task.isAvailableInMenu()) {
                     String taskName = task.getName();
                     MenuItem taskItem = new MenuItem(taskName);
                     taskItem.addActionListener(e -> startTask(taskName));
@@ -107,7 +107,7 @@ public class SystemTrayAppImpl {
         SystemTray.getSystemTray().add(trayIcon);
 
         // Schedule tasks
-        for (Task task : tasks) {
+        for (BackgroundTask task : tasks) {
             int interval = task.getIntervalSeconds();
             if (interval > 0) {
                 TaskStatus status = taskStatuses.computeIfAbsent(task.getName(), k -> new TaskStatus());
@@ -151,7 +151,7 @@ public class SystemTrayAppImpl {
      * @param taskName The name of the task to start
      */
     public void startTask(String taskName) {
-        Task task = tasksByName.get(taskName);
+        BackgroundTask task = tasksByName.get(taskName);
         if (task == null) {
             LOGGER.warning("Task not found: " + taskName);
             return;
@@ -337,9 +337,9 @@ public class SystemTrayAppImpl {
 
             boolean hasAnyTasks = false;
 
-            for (Map.Entry<String, Task> entry : tasksByName.entrySet()) {
+            for (Map.Entry<String, BackgroundTask> entry : tasksByName.entrySet()) {
                 String taskName = entry.getKey();
-                Task task = entry.getValue();
+                BackgroundTask task = entry.getValue();
                 TaskStatus status = taskStatuses.get(taskName);
 
                 if (status != null) {

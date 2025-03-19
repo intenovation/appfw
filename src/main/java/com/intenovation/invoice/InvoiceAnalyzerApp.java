@@ -71,7 +71,7 @@ public class InvoiceAnalyzerApp {
         List<MenuCategory> menuCategories = createMenuCategories();
 
         // Create tasks
-        List<Task> tasks = createTasks();
+        List<BackgroundTask> tasks = createTasks();
 
         // Create the system tray app
         systemTrayApp = new SystemTrayApp(appConfig, menuCategories, tasks);
@@ -130,14 +130,17 @@ public class InvoiceAnalyzerApp {
     /**
      * Create tasks
      */
-    private List<Task> createTasks() {
-        List<Task> tasks = new ArrayList<>();
+    /**
+     * Create tasks
+     */
+    private List<BackgroundTask> createTasks() {
+        List<BackgroundTask> tasks = new ArrayList<>();
 
         // Create the invoice processor task with logging
         final InvoiceProcessor processor = new InvoiceProcessor(emailDirectory, outputDirectory);
 
         // Create a task that adapts to the new ProgressStatusCallback interface
-        Task processorTask = new SimpleTask(
+        BackgroundTask processorTask = new SimpleTask(
                 "Invoice Processor",
                 "Analyzes emails to extract invoice information",
                 processor.getIntervalSeconds(),
