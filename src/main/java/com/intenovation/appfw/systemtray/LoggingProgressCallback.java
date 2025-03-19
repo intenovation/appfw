@@ -1,7 +1,7 @@
 package com.intenovation.appfw.systemtray;
 
-import java.util.logging.Logger;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * A ProgressStatusCallback implementation that logs progress updates

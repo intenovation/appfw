@@ -1,6 +1,7 @@
 package com.intenovation.email.reader.example;
 
 import com.intenovation.email.reader.LocalMail;
+
 import javax.mail.*;
 import javax.mail.search.*;
 import java.io.File;

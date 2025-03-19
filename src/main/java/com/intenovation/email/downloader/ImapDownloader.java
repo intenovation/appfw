@@ -1,12 +1,6 @@
 package com.intenovation.email.downloader;
 
-import com.intenovation.appfw.systemtray.SystemTrayApp;
-import com.intenovation.appfw.systemtray.AppConfig;
-import com.intenovation.appfw.systemtray.Task;
-import com.intenovation.appfw.systemtray.MenuCategory;
-import com.intenovation.appfw.systemtray.CategoryBuilder;
-import com.intenovation.appfw.systemtray.TaskBuilder;
-import com.intenovation.appfw.systemtray.ProgressStatusCallback;
+import com.intenovation.appfw.systemtray.*;
 
 import javax.mail.*;
 import javax.swing.*;

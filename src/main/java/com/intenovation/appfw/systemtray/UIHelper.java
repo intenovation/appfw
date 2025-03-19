@@ -1,13 +1,12 @@
 // File: UIHelper.java
 package com.intenovation.appfw.systemtray;
 
-import java.awt.Desktop;
+import javax.swing.*;
+import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.swing.JOptionPane;
-import javax.swing.SwingUtilities;
 
 /**
  * Helper class for UI operations to hide UI dependencies from the main API

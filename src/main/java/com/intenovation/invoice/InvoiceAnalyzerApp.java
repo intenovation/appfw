@@ -1,7 +1,6 @@
 package com.intenovation.invoice;
 
 import com.intenovation.appfw.systemtray.*;
-import com.intenovation.invoice.Invoice;
 
 import javax.swing.*;
 import java.io.File;

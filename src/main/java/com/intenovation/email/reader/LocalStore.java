@@ -1,8 +1,9 @@
 package com.intenovation.email.reader;
 
 import javax.mail.*;
-import java.io.*;
-import java.util.*;
+import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * A local implementation of the JavaMail API that works with downloaded emails.

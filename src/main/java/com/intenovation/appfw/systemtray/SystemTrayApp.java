@@ -1,18 +1,11 @@
 // File: SystemTrayApp.java
 package com.intenovation.appfw.systemtray;
 
-import com.intenovation.appfw.systemtray.*;
-
+import java.awt.*;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Future;
-import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.awt.AWTException;
 
 /**
  * A unified system tray framework with a backend-friendly API that doesn't expose UI dependencies.
