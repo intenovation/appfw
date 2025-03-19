@@ -13,7 +13,6 @@ import java.util.logging.Logger;
 
 /**
  * Handles email archive cleanup and organization
- * Refactored to extend BackgroundTask
  */
 public class EmailCleanup extends BackgroundTask {
     private static final Logger LOGGER = Logger.getLogger(EmailCleanup.class.getName());
@@ -28,14 +27,12 @@ public class EmailCleanup extends BackgroundTask {
                 "Email Cleanup",
                 "Cleans up and organizes the email archive",
                 cleanupIntervalHours * 3600, // Convert hours to seconds
-                true,                        // Available in menu
-                null                         // We'll override execute() instead of providing an executor
+                true                        // Available in menu
         );
     }
 
     /**
      * Execute the task with progress and status reporting
-     * Override the parent class method to implement our specific logic
      *
      * @param callback Callback for reporting progress and status messages
      * @return Status message that will be displayed on completion

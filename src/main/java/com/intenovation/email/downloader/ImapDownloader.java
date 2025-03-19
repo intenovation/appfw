@@ -174,13 +174,13 @@ public class ImapDownloader {
     private static List<BackgroundTask> createTasks() {
         List<BackgroundTask> tasks = new ArrayList<>();
 
-        // Full email sync task - using class that extends BackgroundTask
+        // Full email sync task
         tasks.add(new EmailDownloader());
 
-        // New email check task - using class that extends BackgroundTask
+        // New email check task
         tasks.add(new EmailDownloader(syncIntervalMinutes));
 
-        // Email cleanup task - using class that extends BackgroundTask
+        // Email cleanup task
         tasks.add(new EmailCleanup(cleanupIntervalHours));
 
         return tasks;

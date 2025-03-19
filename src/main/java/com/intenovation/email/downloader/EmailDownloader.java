@@ -17,7 +17,6 @@ import java.util.logging.Logger;
 
 /**
  * Handles downloading emails from IMAP server
- * Refactored to extend BackgroundTask
  */
 public class EmailDownloader extends BackgroundTask {
     private static final Logger LOGGER = Logger.getLogger(EmailDownloader.class.getName());
@@ -48,13 +47,12 @@ public class EmailDownloader extends BackgroundTask {
      * @param intervalSeconds Interval in seconds
      */
     private EmailDownloader(boolean newOnly, String name, String description, int intervalSeconds) {
-        super(name, description, intervalSeconds, true, null); // We'll override execute() instead of providing an executor
+        super(name, description, intervalSeconds, true);
         this.newOnly = newOnly;
     }
 
     /**
      * Execute the task with progress and status reporting
-     * Override the parent class method to implement our specific logic
      *
      * @param callback Callback for reporting progress and status messages
      * @return Status message that will be displayed on completion

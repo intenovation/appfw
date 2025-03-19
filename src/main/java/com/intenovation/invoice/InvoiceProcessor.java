@@ -17,8 +17,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Invoice processor that extends BackgroundTask.
- * It scans downloaded emails to identify and extract invoice information.
+ * Invoice processor that scans downloaded emails to identify and extract invoice information.
  */
 public class InvoiceProcessor extends BackgroundTask {
     private static final Logger LOGGER = Logger.getLogger(InvoiceProcessor.class.getName());
@@ -41,13 +40,11 @@ public class InvoiceProcessor extends BackgroundTask {
      * @param outputDirectory The directory to save invoice reports
      */
     public InvoiceProcessor(File emailDirectory, File outputDirectory) {
-        // Call the BackgroundTask constructor with appropriate values
         super(
                 "Invoice Processor",
                 "Processes emails to extract invoice information",
                 2 * 60 * 60, // 2 hours interval
-                true,        // Available in menu
-                null         // We'll override execute() method instead of providing an executor
+                true         // Available in menu
         );
 
         this.emailDirectory = emailDirectory;
@@ -60,16 +57,7 @@ public class InvoiceProcessor extends BackgroundTask {
     }
 
     /**
-     * Get the interval in seconds for this task
-     * @return Interval in seconds
-     */
-    public int getIntervalSeconds() {
-        return 2 * 60 * 60; // 2 hours
-    }
-
-    /**
      * Execute the task with progress and status reporting
-     * Override the parent class method to implement our specific logic
      *
      * @param callback Callback for reporting progress and status messages
      * @return Status message that will be displayed on completion
