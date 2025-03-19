@@ -130,17 +130,14 @@ public class InvoiceAnalyzerApp {
     /**
      * Create tasks
      */
-    /**
-     * Create tasks
-     */
     private List<BackgroundTask> createTasks() {
         List<BackgroundTask> tasks = new ArrayList<>();
 
         // Create the invoice processor task with logging
         final InvoiceProcessor processor = new InvoiceProcessor(emailDirectory, outputDirectory);
 
-        // Create a task that adapts to the new ProgressStatusCallback interface
-        BackgroundTask processorTask = new SimpleTask(
+        // Using BackgroundTaskImpl instead of SimpleTask
+        tasks.add(new BackgroundTaskImpl(
                 "Invoice Processor",
                 "Analyzes emails to extract invoice information",
                 processor.getIntervalSeconds(),
@@ -175,9 +172,8 @@ public class InvoiceAnalyzerApp {
                         return "Error: " + e.getMessage();
                     }
                 }
-        );
+        ));
 
-        tasks.add(processorTask);
         return tasks;
     }
 
@@ -342,9 +338,15 @@ public class InvoiceAnalyzerApp {
                 sampleDir.mkdirs();
             }
 
+            // Create a messages directory (for the new structure)
+            File messagesDir = new File(sampleDir, "messages");
+            if (!messagesDir.exists()) {
+                messagesDir.mkdirs();
+            }
+
             // Create a directory for the message
             String messageId = "sample-invoice-" + System.currentTimeMillis();
-            File messageDir = new File(sampleDir, messageId);
+            File messageDir = new File(messagesDir, messageId);
             messageDir.mkdirs();
 
             // Create message.properties

@@ -167,122 +167,119 @@ public class ImapDownloader {
 
         return categories;
     }
-
     /**
-     * Create the background tasks for the application
-     * @return The tasks
-     */
-    /**
-     * Create the background tasks for the application
-     * @return The tasks
-     */
-    private static List<BackgroundTask> createTasks() {
-        List<BackgroundTask> tasks = new ArrayList<>();
+ * Create the background tasks for the application
+ * @return The tasks
+ */
+private static List<BackgroundTask> createTasks() {
+    List<BackgroundTask> tasks = new ArrayList<>();
 
-        // Full email sync task
-        tasks.add(new TaskBuilder("Full Email Sync")
-                .withDescription("Downloads all emails from the IMAP server")
-                .withIntervalSeconds(3600 * 12) // Every 12 hours by default
-                .showInMenu(true)
-                .withExecutor(callback -> {
-                    LOGGER.info("Starting Full Email Sync");
+    // Full email sync task - using BackgroundTaskImpl.Builder
+    tasks.add(new BackgroundTaskImpl.Builder("Full Email Sync")
+            .withDescription("Downloads all emails from the IMAP server")
+            .withIntervalSeconds(3600 * 12) // Every 12 hours by default
+            .availableInMenu(true) // Note: changed from showInMenu to availableInMenu
+            .withExecutor(callback -> {
+                LOGGER.info("Starting Full Email Sync");
 
-                    // Create a logging wrapper around the callback
-                    ProgressStatusCallback loggingCallback = new ProgressStatusCallback() {
-                        @Override
-                        public void update(int percent, String message) {
-                            // Update the original callback
-                            callback.update(percent, message);
+                // Create a logging wrapper around the callback
+                ProgressStatusCallback loggingCallback = new ProgressStatusCallback() {
+                    @Override
+                    public void update(int percent, String message) {
+                        // Update the original callback
+                        callback.update(percent, message);
 
-                            // Log the progress
-                            LOGGER.info(String.format("[Full Email Sync] %d%% - %s", percent, message));
-                        }
-                    };
-
-                    try {
-                        // Execute the download with our logging callback
-                        String result = downloadEmails(loggingCallback, false);
-                        LOGGER.info("Full Email Sync completed: " + result);
-                        return result;
-                    } catch (InterruptedException e) {
-                        LOGGER.warning("Full Email Sync was interrupted");
-                        throw e;
-                    } catch (Exception e) {
-                        LOGGER.log(Level.SEVERE, "Full Email Sync error", e);
-                        return "Error: " + e.getMessage();
+                        // Log the progress
+                        LOGGER.info(String.format("[Full Email Sync] %d%% - %s", percent, message));
                     }
-                })
-                .build());
+                };
 
-        // New email check task
-        tasks.add(new TaskBuilder("New Emails Only")
-                .withDescription("Downloads only new emails since last check")
-                .withIntervalSeconds(syncIntervalMinutes * 60) // Using configured interval
-                .showInMenu(true)
-                .withExecutor(callback -> {
-                    LOGGER.info("Starting New Emails Sync");
+                try {
+                    // Execute the download with our logging callback
+                    String result = downloadEmails(loggingCallback, false);
+                    LOGGER.info("Full Email Sync completed: " + result);
+                    return result;
+                } catch (InterruptedException e) {
+                    LOGGER.warning("Full Email Sync was interrupted");
+                    throw e;
+                } catch (Exception e) {
+                    LOGGER.log(Level.SEVERE, "Full Email Sync error", e);
+                    return "Error: " + e.getMessage();
+                }
+            })
+            .build());
 
-                    // Create a logging wrapper around the callback
-                    ProgressStatusCallback loggingCallback = new ProgressStatusCallback() {
-                        @Override
-                        public void update(int percent, String message) {
-                            // Update the original callback
-                            callback.update(percent, message);
+    // New email check task - using Tasks factory method
+    tasks.add(Tasks.create(
+            "New Emails Only",
+            "Downloads only new emails since last check",
+            syncIntervalMinutes * 60,
+            true,
+            callback -> {
+                LOGGER.info("Starting New Emails Sync");
 
-                            // Log the progress
-                            LOGGER.info(String.format("[New Emails Sync] %d%% - %s", percent, message));
-                        }
-                    };
+                // Create a logging wrapper around the callback
+                ProgressStatusCallback loggingCallback = new ProgressStatusCallback() {
+                    @Override
+                    public void update(int percent, String message) {
+                        // Update the original callback
+                        callback.update(percent, message);
 
-                    try {
-                        // Execute the download with our logging callback
-                        String result = downloadEmails(loggingCallback, true);
-                        LOGGER.info("New Emails Sync completed: " + result);
-                        return result;
-                    } catch (InterruptedException e) {
-                        LOGGER.warning("New Emails Sync was interrupted");
-                        throw e;
-                    } catch (Exception e) {
-                        LOGGER.log(Level.SEVERE, "New Emails Sync error", e);
-                        return "Error: " + e.getMessage();
+                        // Log the progress
+                        LOGGER.info(String.format("[New Emails Sync] %d%% - %s", percent, message));
                     }
-                })
-                .build());
+                };
 
-        // Email cleanup task
-        tasks.add(new TaskBuilder("Email Cleanup")
-                .withDescription("Cleans up and organizes the email archive")
-                .withIntervalSeconds(cleanupIntervalHours * 3600) // Using configured interval
-                .showInMenu(true)
-                .withExecutor(callback -> {
-                    LOGGER.info("Starting Email Cleanup");
+                try {
+                    // Execute the download with our logging callback
+                    String result = downloadEmails(loggingCallback, true);
+                    LOGGER.info("New Emails Sync completed: " + result);
+                    return result;
+                } catch (InterruptedException e) {
+                    LOGGER.warning("New Emails Sync was interrupted");
+                    throw e;
+                } catch (Exception e) {
+                    LOGGER.log(Level.SEVERE, "New Emails Sync error", e);
+                    return "Error: " + e.getMessage();
+                }
+            }
+    ));
 
-                    // Create a logging wrapper around the callback
-                    ProgressStatusCallback loggingCallback = new ProgressStatusCallback() {
-                        @Override
-                        public void update(int percent, String message) {
-                            // Update the original callback
-                            callback.update(percent, message);
+    // Email cleanup task - using direct BackgroundTaskImpl constructor
+    tasks.add(new BackgroundTaskImpl(
+            "Email Cleanup",
+            "Cleans up and organizes the email archive",
+            cleanupIntervalHours * 3600,
+            true,
+            callback -> {
+                LOGGER.info("Starting Email Cleanup");
 
-                            // Log the progress
-                            LOGGER.info(String.format("[Email Cleanup] %d%% - %s", percent, message));
-                        }
-                    };
+                // Create a logging wrapper around the callback
+                ProgressStatusCallback loggingCallback = new ProgressStatusCallback() {
+                    @Override
+                    public void update(int percent, String message) {
+                        // Update the original callback
+                        callback.update(percent, message);
 
-                    try {
-                        // Execute the cleanup with our logging callback
-                        String result = cleanupEmailArchive(loggingCallback);
-                        LOGGER.info("Email Cleanup completed: " + result);
-                        return result;
-                    } catch (InterruptedException e) {
-                        LOGGER.warning("Email Cleanup was interrupted");
-                        throw e;
-                    } catch (Exception e) {
-                        LOGGER.log(Level.SEVERE, "Email Cleanup error", e);
-                        return "Error: " + e.getMessage();
+                        // Log the progress
+                        LOGGER.info(String.format("[Email Cleanup] %d%% - %s", percent, message));
                     }
-                })
-                .build());
+                };
+
+                try {
+                    // Execute the cleanup with our logging callback
+                    String result = cleanupEmailArchive(loggingCallback);
+                    LOGGER.info("Email Cleanup completed: " + result);
+                    return result;
+                } catch (InterruptedException e) {
+                    LOGGER.warning("Email Cleanup was interrupted");
+                    throw e;
+                } catch (Exception e) {
+                    LOGGER.log(Level.SEVERE, "Email Cleanup error", e);
+                    return "Error: " + e.getMessage();
+                }
+            }
+    ));
 
         return tasks;
     }

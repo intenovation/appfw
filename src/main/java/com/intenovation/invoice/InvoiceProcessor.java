@@ -1,6 +1,6 @@
 package com.intenovation.invoice;
 
-import com.intenovation.appfw.systemtray.AbstractBackgroundTask;
+import com.intenovation.appfw.systemtray.BackgroundTask;
 import com.intenovation.appfw.systemtray.ProgressStatusCallback;
 import com.intenovation.email.reader.LocalMail;
 
@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
  * Invoice processor that implements the BackgroundTask interface.
  * It scans downloaded emails to identify and extract invoice information.
  */
-public class InvoiceProcessor extends AbstractBackgroundTask {
+public class InvoiceProcessor implements BackgroundTask {
     private static final Logger LOGGER = Logger.getLogger(InvoiceProcessor.class.getName());
 
     // Regular expressions for extracting invoice information
@@ -34,6 +34,12 @@ public class InvoiceProcessor extends AbstractBackgroundTask {
     private final File emailDirectory;
     private final File outputDirectory;
 
+    // BackgroundTask implementation properties
+    private final String name = "Invoice Processor";
+    private final String description = "Processes emails to extract invoice information";
+    private final int intervalSeconds = 2 * 60 * 60; // 2 hours
+    private final boolean availableInMenu = true;
+
     /**
      * Create a new invoice processor task
      *
@@ -41,7 +47,6 @@ public class InvoiceProcessor extends AbstractBackgroundTask {
      * @param outputDirectory The directory to save invoice reports
      */
     public InvoiceProcessor(File emailDirectory, File outputDirectory) {
-        super("Invoice Processor", "Processes emails to extract invoice information", 2 * 60 * 60, true);
         this.emailDirectory = emailDirectory;
         this.outputDirectory = outputDirectory;
 
@@ -49,6 +54,28 @@ public class InvoiceProcessor extends AbstractBackgroundTask {
         if (!outputDirectory.exists()) {
             outputDirectory.mkdirs();
         }
+    }
+
+    // BackgroundTask interface implementation
+
+    @Override
+    public String getName() {
+        return name;
+    }
+
+    @Override
+    public String getDescription() {
+        return description;
+    }
+
+    @Override
+    public int getIntervalSeconds() {
+        return intervalSeconds;
+    }
+
+    @Override
+    public boolean isAvailableInMenu() {
+        return availableInMenu;
     }
 
     @Override
