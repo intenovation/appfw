@@ -137,7 +137,7 @@ public class InvoiceAnalyzerApp {
         final InvoiceProcessor processor = new InvoiceProcessor(emailDirectory, outputDirectory);
 
         // Using BackgroundTaskImpl instead of SimpleTask
-        tasks.add(new BackgroundTaskImpl(
+        tasks.add(new BackgroundTask(
                 "Invoice Processor",
                 "Analyzes emails to extract invoice information",
                 processor.getIntervalSeconds(),

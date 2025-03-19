@@ -175,7 +175,7 @@ private static List<BackgroundTask> createTasks() {
     List<BackgroundTask> tasks = new ArrayList<>();
 
     // Full email sync task - using BackgroundTaskImpl.Builder
-    tasks.add(new BackgroundTaskImpl.Builder("Full Email Sync")
+    tasks.add(new BackgroundTask.Builder("Full Email Sync")
             .withDescription("Downloads all emails from the IMAP server")
             .withIntervalSeconds(3600 * 12) // Every 12 hours by default
             .availableInMenu(true) // Note: changed from showInMenu to availableInMenu
@@ -210,7 +210,7 @@ private static List<BackgroundTask> createTasks() {
             .build());
 
     // New email check task - using Tasks factory method
-    tasks.add(Tasks.create(
+    tasks.add(BackgroundTask.create(
             "New Emails Only",
             "Downloads only new emails since last check",
             syncIntervalMinutes * 60,
@@ -246,7 +246,7 @@ private static List<BackgroundTask> createTasks() {
     ));
 
     // Email cleanup task - using direct BackgroundTaskImpl constructor
-    tasks.add(new BackgroundTaskImpl(
+    tasks.add(new BackgroundTask(
             "Email Cleanup",
             "Cleans up and organizes the email archive",
             cleanupIntervalHours * 3600,

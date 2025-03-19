@@ -17,10 +17,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Invoice processor that implements the BackgroundTask interface.
+ * Invoice processor that extends BackgroundTask.
  * It scans downloaded emails to identify and extract invoice information.
  */
-public class InvoiceProcessor implements BackgroundTask {
+public class InvoiceProcessor extends BackgroundTask {
     private static final Logger LOGGER = Logger.getLogger(InvoiceProcessor.class.getName());
 
     // Regular expressions for extracting invoice information
@@ -34,12 +34,6 @@ public class InvoiceProcessor implements BackgroundTask {
     private final File emailDirectory;
     private final File outputDirectory;
 
-    // BackgroundTask implementation properties
-    private final String name = "Invoice Processor";
-    private final String description = "Processes emails to extract invoice information";
-    private final int intervalSeconds = 2 * 60 * 60; // 2 hours
-    private final boolean availableInMenu = true;
-
     /**
      * Create a new invoice processor task
      *
@@ -47,6 +41,15 @@ public class InvoiceProcessor implements BackgroundTask {
      * @param outputDirectory The directory to save invoice reports
      */
     public InvoiceProcessor(File emailDirectory, File outputDirectory) {
+        // Call the BackgroundTask constructor with appropriate values
+        super(
+                "Invoice Processor",
+                "Processes emails to extract invoice information",
+                2 * 60 * 60, // 2 hours interval
+                true,        // Available in menu
+                null         // We'll override execute() method instead of providing an executor
+        );
+
         this.emailDirectory = emailDirectory;
         this.outputDirectory = outputDirectory;
 
@@ -56,28 +59,14 @@ public class InvoiceProcessor implements BackgroundTask {
         }
     }
 
-    // BackgroundTask interface implementation
-
-    @Override
-    public String getName() {
-        return name;
-    }
-
-    @Override
-    public String getDescription() {
-        return description;
-    }
-
-    @Override
-    public int getIntervalSeconds() {
-        return intervalSeconds;
-    }
-
-    @Override
-    public boolean isAvailableInMenu() {
-        return availableInMenu;
-    }
-
+    /**
+     * Execute the task with progress and status reporting
+     * Override the parent class method to implement our specific logic
+     *
+     * @param callback Callback for reporting progress and status messages
+     * @return Status message that will be displayed on completion
+     * @throws InterruptedException if the task is cancelled
+     */
     @Override
     public String execute(ProgressStatusCallback callback) throws InterruptedException {
         callback.update(0, "Initializing invoice processor...");
