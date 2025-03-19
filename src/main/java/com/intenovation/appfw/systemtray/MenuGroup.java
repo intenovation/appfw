@@ -18,7 +18,7 @@ public interface MenuGroup {
      *
      * @return List of menu actions
      */
-    List<MenuAction> getMenuActions();
+    List<Action> getMenuActions();
 
     /**
      * Get submenus in this submenu

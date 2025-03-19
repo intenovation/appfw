@@ -8,14 +8,14 @@ import java.util.List;
  */
 public class SimpleMenuGroup implements MenuGroup {
     private final String label;
-    private final List<MenuAction> actions = new ArrayList<>();
+    private final List<Action> actions = new ArrayList<>();
     private final List<MenuGroup> subGroups = new ArrayList<>();
 
     public SimpleMenuGroup(String label) {
         this.label = label;
     }
 
-    public SimpleMenuGroup addAction(MenuAction action) {
+    public SimpleMenuGroup addAction(Action action) {
         actions.add(action);
         return this;
     }
@@ -31,7 +31,7 @@ public class SimpleMenuGroup implements MenuGroup {
     }
 
     @Override
-    public List<MenuAction> getMenuActions() {
+    public List<Action> getMenuActions() {
         return actions;
     }
 
