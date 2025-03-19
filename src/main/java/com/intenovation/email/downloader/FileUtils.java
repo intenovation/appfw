@@ -5,36 +5,52 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Utility methods for file operations
+ * Refactored to work with the new file structure that uses a "messages" folder
  */
 public class FileUtils {
-    
+
     /**
      * Count all emails in the archive
-     * 
+     *
      * @param baseDir The base directory
      * @return The total number of emails
      */
     public static int countAllEmails(File baseDir) {
         AtomicInteger count = new AtomicInteger(0);
-        
+
         File[] folders = baseDir.listFiles(File::isDirectory);
         if (folders != null) {
             for (File folder : folders) {
                 if (folder.getName().startsWith(".")) continue;
-                
-                File[] messages = folder.listFiles(File::isDirectory);
-                if (messages != null) {
-                    count.addAndGet(messages.length);
+
+                // Check for messages in the "messages" directory (new structure)
+                File messagesDir = new File(folder, "messages");
+                if (messagesDir.exists() && messagesDir.isDirectory()) {
+                    File[] messages = messagesDir.listFiles(File::isDirectory);
+                    if (messages != null) {
+                        count.addAndGet(messages.length);
+                    }
+                } else {
+                    // Check for messages directly in the folder (old structure)
+                    File[] directMessages = folder.listFiles(file ->
+                            file.isDirectory() &&
+                                    !file.getName().startsWith(".") &&
+                                    !file.getName().equals("messages") &&
+                                    new File(file, "message.properties").exists()
+                    );
+                    if (directMessages != null) {
+                        count.addAndGet(directMessages.length);
+                    }
                 }
             }
         }
-        
+
         return count.get();
     }
-    
+
     /**
      * Get the size of a folder recursively
-     * 
+     *
      * @param folder The folder
      * @return The size in bytes
      */
@@ -42,9 +58,9 @@ public class FileUtils {
         if (folder == null || !folder.exists()) {
             return 0;
         }
-        
+
         long size = 0;
-        
+
         File[] files = folder.listFiles();
         if (files != null) {
             for (File file : files) {
@@ -55,13 +71,13 @@ public class FileUtils {
                 }
             }
         }
-        
+
         return size;
     }
-    
+
     /**
      * Format a size in bytes to a human-readable string
-     * 
+     *
      * @param bytes The size in bytes
      * @return A formatted string
      */
@@ -76,10 +92,10 @@ public class FileUtils {
             return String.format("%.2f GB", bytes / (1024.0 * 1024 * 1024));
         }
     }
-    
+
     /**
      * Count the folders in the archive
-     * 
+     *
      * @param baseDir The base directory
      * @return The number of folders
      */
@@ -87,60 +103,54 @@ public class FileUtils {
         if (!baseDir.exists() || !baseDir.isDirectory()) {
             return 0;
         }
-        
-        File[] folders = baseDir.listFiles(File::isDirectory);
-        if (folders == null) {
-            return 0;
-        }
-        
-        int count = 0;
-        for (File folder : folders) {
-            if (!folder.getName().startsWith(".")) {
-                count++;
-            }
-        }
-        
-        return count;
+
+        File[] folders = baseDir.listFiles(file ->
+                file.isDirectory() &&
+                        !file.getName().startsWith(".") &&
+                        !file.getName().equals("messages")
+        );
+
+        return folders != null ? folders.length : 0;
     }
-    
+
     /**
      * Count the emails in the archive
-     * 
+     *
      * @param baseDir The base directory
      * @return The number of emails
      */
     public static int countEmails(File baseDir) {
         return countAllEmails(baseDir);
     }
-    
+
     /**
      * Sanitize a folder name for use in a file path
-     * 
+     *
      * @param folderName The folder name
      * @return A safe folder name
      */
     public static String sanitizeFolderName(String folderName) {
         // Replace characters that are invalid in file names
         String safe = folderName.replaceAll("[\\\\/:*?\"<>|]", "_");
-        
+
         // Replace sequences of dots or underscores with a single one
         safe = safe.replaceAll("\\.{2,}", ".");
         safe = safe.replaceAll("_{2,}", "_");
-        
+
         // Trim leading/trailing dots and spaces
         safe = safe.replaceAll("^[\\s\\.]+|[\\s\\.]+$", "");
-        
+
         // If the name became empty, use a default
         if (safe.isEmpty()) {
             safe = "unnamed_folder";
         }
-        
+
         return safe;
     }
-    
+
     /**
      * Sanitize a file name for use in a file path
-     * 
+     *
      * @param fileName The file name
      * @return A safe file name
      */
@@ -149,17 +159,17 @@ public class FileUtils {
         if (fileName == null || fileName.isEmpty()) {
             return "unnamed_file";
         }
-        
+
         // Replace characters that are invalid in file names
         String safe = fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
-        
+
         // Replace sequences of dots or underscores with a single one
         safe = safe.replaceAll("\\.{2,}", ".");
         safe = safe.replaceAll("_{2,}", "_");
-        
+
         // Trim leading/trailing dots and spaces
         safe = safe.replaceAll("^[\\s\\.]+|[\\s\\.]+$", "");
-        
+
         // Limit length to avoid file system issues
         if (safe.length() > 200) {
             int extensionPos = safe.lastIndexOf(".");
@@ -171,18 +181,18 @@ public class FileUtils {
                 safe = safe.substring(0, 200);
             }
         }
-        
+
         // If the name became empty, use a default
         if (safe.isEmpty()) {
             safe = "unnamed_file";
         }
-        
+
         return safe;
     }
-    
+
     /**
      * Delete a directory and its contents
-     * 
+     *
      * @param directory The directory to delete
      * @return true if successful
      */

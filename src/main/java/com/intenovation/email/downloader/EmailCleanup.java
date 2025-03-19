@@ -12,81 +12,120 @@ import java.util.logging.Logger;
 
 /**
  * Handles email archive cleanup and organization
+ * Refactored to work with the new file structure that uses a "messages" folder
  */
 public class EmailCleanup {
     private static final Logger LOGGER = Logger.getLogger(EmailCleanup.class.getName());
-    
+
     /**
      * Clean up and organize the email archive
-     * 
+     *
      * @param progressUpdater Function to report progress
      * @param statusUpdater Function to report status
      * @return Status message
      * @throws InterruptedException if task is cancelled
      */
-    public static String cleanupEmailArchive(Consumer<Integer> progressUpdater, Consumer<String> statusUpdater) 
+    public static String cleanupEmailArchive(Consumer<Integer> progressUpdater, Consumer<String> statusUpdater)
             throws InterruptedException {
         statusUpdater.accept("Starting email archive cleanup...");
         progressUpdater.accept(0);
-        
+
         String storagePath = ImapDownloader.getStoragePath();
         File baseDir = new File(storagePath);
         if (!baseDir.exists()) {
             return "Email archive directory does not exist";
         }
-        
+
         try {
             // Get all folders
             File[] folders = baseDir.listFiles(File::isDirectory);
             if (folders == null || folders.length == 0) {
                 return "No folders found in email archive";
             }
-            
+
             int totalFolders = folders.length;
             int processedFolders = 0;
             int totalEmails = FileUtils.countAllEmails(baseDir);
             int processedEmails = 0;
             int duplicatesRemoved = 0;
             int emptyDirectoriesRemoved = 0;
-            
-            statusUpdater.accept("Found " + totalFolders + " folders with approximately " + 
-                              totalEmails + " emails");
+
+            statusUpdater.accept("Found " + totalFolders + " folders with approximately " +
+                    totalEmails + " emails");
             progressUpdater.accept(5);
-            
+
             // Track message IDs to find duplicates
             Map<String, File> messageIds = new HashMap<>();
-            
+
             // Process each folder
             for (File folder : folders) {
                 // Skip hidden folders and special files
                 if (folder.getName().startsWith(".") || !folder.isDirectory()) {
                     continue;
                 }
-                
+
                 statusUpdater.accept("Cleaning folder: " + folder.getName());
-                
+
                 // Check for interruption
                 if (Thread.currentThread().isInterrupted()) {
                     throw new InterruptedException("Task cancelled");
                 }
-                
+
+                // Ensure the "messages" directory exists in this folder
+                File messagesDir = new File(folder, "messages");
+                if (!messagesDir.exists()) {
+                    // This folder might be using the old structure
+                    // Check if there are message directories directly in the folder
+                    boolean hasMessageDirectories = false;
+                    File[] folderContents = folder.listFiles();
+                    if (folderContents != null) {
+                        for (File content : folderContents) {
+                            if (content.isDirectory() && !content.getName().equals("messages") &&
+                                    new File(content, "message.properties").exists()) {
+                                hasMessageDirectories = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (hasMessageDirectories) {
+                        // Migrate message directories to the new structure
+                        messagesDir.mkdirs();
+
+                        for (File content : folderContents) {
+                            if (content.isDirectory() && !content.getName().equals("messages") &&
+                                    new File(content, "message.properties").exists()) {
+                                // This is a message directory in the old structure
+                                File newLocation = new File(messagesDir, content.getName());
+                                boolean moved = content.renameTo(newLocation);
+                                if (!moved) {
+                                    LOGGER.warning("Failed to move message directory: " + content.getPath());
+                                }
+                            }
+                        }
+                    } else {
+                        // This is likely a normal folder without message directories
+                        messagesDir.mkdirs();
+                    }
+                }
+
                 // Process emails in this folder
-                File[] messageDirs = folder.listFiles(File::isDirectory);
+                File[] messageDirs = messagesDir.listFiles(File::isDirectory);
                 if (messageDirs != null) {
                     for (File messageDir : messageDirs) {
                         // Check for interruption
                         if (Thread.currentThread().isInterrupted()) {
                             throw new InterruptedException("Task cancelled");
                         }
-                        
+
                         processedEmails++;
-                        
+
                         // Check if this message has valid properties
                         File propsFile = new File(messageDir, "message.properties");
                         if (!propsFile.exists()) {
                             continue;
                         }
-                        
+
                         try {
                             // Load properties
                             Properties props = new Properties();
@@ -113,7 +152,7 @@ public class EmailCleanup {
                                         // Keep the newer message
                                         long existingTime = existingDir.lastModified();
                                         long currentTime = messageDir.lastModified();
-                                        
+
                                         if (currentTime > existingTime) {
                                             // Current is newer, remove existing
                                             FileUtils.deleteDirectory(existingDir);
@@ -122,80 +161,92 @@ public class EmailCleanup {
                                             // Existing is newer, remove current
                                             FileUtils.deleteDirectory(messageDir);
                                         }
-                                        
+
                                         duplicatesRemoved++;
                                     }
                                 } else {
                                     messageIds.put(messageId, messageDir);
                                 }
                             }
-                            
+
                             // Update progress
                             if (totalEmails > 0) {
                                 int progress = 5 + (90 * processedEmails / totalEmails);
                                 progressUpdater.accept(Math.min(95, progress));
                             }
-                            
+
                             // Update status periodically
                             if (processedEmails % 50 == 0) {
-                                statusUpdater.accept("Processed " + processedEmails + " of ~" + 
-                                                  totalEmails + " emails. Removed " + 
-                                                  duplicatesRemoved + " duplicates.");
+                                statusUpdater.accept("Processed " + processedEmails + " of ~" +
+                                        totalEmails + " emails. Removed " +
+                                        duplicatesRemoved + " duplicates.");
                             }
-                            
+
                         } catch (IOException e) {
                             LOGGER.log(Level.WARNING, "Error reading properties for " + messageDir.getName(), e);
                             // Continue with next message
                         }
                     }
                 }
-                
-                // Check for and remove empty directories
+
+                // Check for and remove empty message directories
+                if (messagesDir.exists() && messagesDir.list().length == 0) {
+                    messagesDir.delete();
+                }
+
+                // Check for and remove empty folders
                 if (folder.listFiles().length == 0) {
                     folder.delete();
                     emptyDirectoriesRemoved++;
                 }
-                
+
                 processedFolders++;
                 if (totalEmails == 0) { // Only update based on folders if no emails
                     int progress = 5 + (90 * processedFolders / totalFolders);
                     progressUpdater.accept(Math.min(95, progress));
                 }
             }
-            
+
             // Finalizing
             statusUpdater.accept("Finalizing cleanup...");
             progressUpdater.accept(95);
-            
+
             // Remove empty directories one more time
             folders = baseDir.listFiles(File::isDirectory);
             if (folders != null) {
                 for (File folder : folders) {
                     if (folder.getName().startsWith(".")) continue;
-                    
+
+                    // Check if messages directory is empty
+                    File messagesDir = new File(folder, "messages");
+                    if (messagesDir.exists() && messagesDir.listFiles().length == 0) {
+                        messagesDir.delete();
+                    }
+
+                    // Check if folder is now empty
                     if (folder.isDirectory() && folder.listFiles().length == 0) {
                         folder.delete();
                         emptyDirectoriesRemoved++;
                     }
                 }
             }
-            
+
             // Compact the database if needed
             File[] allFiles = baseDir.listFiles();
             if (allFiles != null) {
                 int totalFiles = allFiles.length;
                 if (totalFiles > 10000) {
                     statusUpdater.accept("Database is large (" + totalFiles + " files). " +
-                                      "Consider archiving older emails.");
+                            "Consider archiving older emails.");
                 }
             }
-            
+
             progressUpdater.accept(100);
-            
-            return "Cleanup complete. Processed " + processedEmails + " emails in " + 
-                  processedFolders + " folders. Removed " + duplicatesRemoved + 
-                  " duplicates and " + emptyDirectoriesRemoved + " empty directories.";
-            
+
+            return "Cleanup complete. Processed " + processedEmails + " emails in " +
+                    processedFolders + " folders. Removed " + duplicatesRemoved +
+                    " duplicates and " + emptyDirectoriesRemoved + " empty directories.";
+
         } catch (InterruptedException e) {
             throw e;
         } catch (Exception e) {

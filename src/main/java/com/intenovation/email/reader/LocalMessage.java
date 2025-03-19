@@ -10,11 +10,17 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * A local implementation of the JavaMail Message class that reads from the filesystem.
+ * No major changes needed for the new file structure since this class works with a message
+ * directory regardless of where it's located.
  */
 class LocalMessage extends MimeMessage {
+    private static final Logger LOGGER = Logger.getLogger(LocalMessage.class.getName());
+
     private final File messageDirectory;
     private Properties properties;
     private Date receivedDate;
@@ -53,7 +59,7 @@ class LocalMessage extends MimeMessage {
                     try {
                         this.sentDate = sdf.parse(sentDateStr);
                     } catch (ParseException e) {
-                        // Ignore
+                        LOGGER.log(Level.WARNING, "Error parsing sent date: " + sentDateStr, e);
                     }
                 }
 
@@ -62,7 +68,7 @@ class LocalMessage extends MimeMessage {
                     try {
                         this.receivedDate = sdf.parse(receivedDateStr);
                     } catch (ParseException e) {
-                        // Ignore
+                        LOGGER.log(Level.WARNING, "Error parsing received date: " + receivedDateStr, e);
                     }
                 }
 
@@ -107,6 +113,12 @@ class LocalMessage extends MimeMessage {
             File contentFile = new File(messageDirectory, "content.txt");
             if (contentFile.exists()) {
                 this.content = new String(Files.readAllBytes(contentFile.toPath()), StandardCharsets.UTF_8);
+            } else {
+                // Try to find any other text content file that might exist
+                File[] files = messageDirectory.listFiles((dir, name) -> name.endsWith(".txt"));
+                if (files != null && files.length > 0) {
+                    this.content = new String(Files.readAllBytes(files[0].toPath()), StandardCharsets.UTF_8);
+                }
             }
 
             loaded = true;
@@ -189,6 +201,7 @@ class LocalMessage extends MimeMessage {
         try {
             return new Address[]{new InternetAddress(from)};
         } catch (Exception e) {
+            // If the address is invalid, try to create it anyway but mark it as non-strict
             return new Address[]{new InternetAddress(from, true)};
         }
     }

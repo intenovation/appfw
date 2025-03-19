@@ -7,11 +7,16 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * A local implementation of the JavaMail Folder class that reads from the filesystem.
+ * Refactored to support the new file structure with a "messages" subdirectory.
  */
 class LocalFolder extends Folder {
+    private static final Logger LOGGER = Logger.getLogger(LocalFolder.class.getName());
+
     private final File directory;
     private final String folderName;
     private boolean isOpen = false;
@@ -62,12 +67,11 @@ class LocalFolder extends Folder {
 
     @Override
     public Folder[] list(String pattern) throws MessagingException {
-        // Only list directories that don't have message.properties (actual folders, not messages)
+        // Only consider directories that are not "messages" directories as folders
         File[] subdirs = directory.listFiles(file ->
                 file.isDirectory() &&
                         !file.getName().startsWith(".") &&
-                        !file.getName().equals("attachments") &&
-                        !new File(file, "message.properties").exists()
+                        !file.getName().equals("messages")
         );
 
         if (subdirs == null) {
@@ -96,9 +100,15 @@ class LocalFolder extends Folder {
     @Override
     public int getType() throws MessagingException {
         if (folderName == null) {
-            return HOLDS_FOLDERS; // Root folder
+            return HOLDS_FOLDERS; // Root folder always holds folders
         }
-        return HOLDS_MESSAGES | HOLDS_FOLDERS;
+
+        // Check if this folder has a "messages" subdirectory
+        File messagesDir = new File(directory, "messages");
+        boolean hasMessages = messagesDir.exists() && messagesDir.isDirectory();
+
+        // A folder can hold both messages and subfolders
+        return (hasMessages ? HOLDS_MESSAGES : 0) | HOLDS_FOLDERS;
     }
 
     @Override
@@ -107,7 +117,15 @@ class LocalFolder extends Folder {
             return false;
         }
 
-        return directory.mkdirs();
+        boolean created = directory.mkdirs();
+
+        // If the folder should hold messages, create the messages subdirectory
+        if (created && (type & HOLDS_MESSAGES) != 0) {
+            File messagesDir = new File(directory, "messages");
+            messagesDir.mkdir();
+        }
+
+        return created;
     }
 
     @Override
@@ -164,22 +182,51 @@ class LocalFolder extends Folder {
         this.mode = mode;
         this.isOpen = true;
 
-        // Load messages - only directories with message.properties are considered messages
-        File[] messageDirs = directory.listFiles(file ->
-                file.isDirectory() &&
-                        !file.getName().startsWith(".") &&
-                        !file.getName().equals("attachments") &&
-                        new File(file, "message.properties").exists()
-        );
+        // Load messages from the "messages" subdirectory
+        File messagesDir = new File(directory, "messages");
 
-        if (messageDirs != null) {
-            for (File messageDir : messageDirs) {
-                try {
-                    LocalMessage message = new LocalMessage(this, messageDir);
-                    messages.add(message);
-                } catch (Exception e) {
-                    // Log error but continue with other messages
-                    System.err.println("Error loading message: " + e.getMessage());
+        // Handle the old structure where messages are directly in the folder directory
+        if (!messagesDir.exists() || !messagesDir.isDirectory()) {
+            // Check if there are message directories directly in the folder (old structure)
+            File[] directMessageDirs = directory.listFiles(file ->
+                    file.isDirectory() &&
+                            !file.getName().startsWith(".") &&
+                            new File(file, "message.properties").exists()
+            );
+
+            if (directMessageDirs != null && directMessageDirs.length > 0) {
+                LOGGER.log(Level.INFO, "Found messages in old structure for folder: " + getFullName());
+
+                // Migrate to new structure
+                messagesDir.mkdir();
+
+                for (File messageDir : directMessageDirs) {
+                    File newLocation = new File(messagesDir, messageDir.getName());
+                    boolean moved = messageDir.renameTo(newLocation);
+                    if (!moved) {
+                        LOGGER.log(Level.WARNING, "Failed to move message directory: " + messageDir.getPath());
+                    }
+                }
+            }
+        }
+
+        // Load messages from the messages directory if it exists
+        if (messagesDir.exists() && messagesDir.isDirectory()) {
+            File[] messageDirs = messagesDir.listFiles(file ->
+                    file.isDirectory() &&
+                            !file.getName().startsWith(".") &&
+                            new File(file, "message.properties").exists()
+            );
+
+            if (messageDirs != null) {
+                for (File messageDir : messageDirs) {
+                    try {
+                        LocalMessage message = new LocalMessage(this, messageDir);
+                        messages.add(message);
+                    } catch (Exception e) {
+                        // Log error but continue with other messages
+                        LOGGER.log(Level.WARNING, "Error loading message: " + e.getMessage());
+                    }
                 }
             }
         }
@@ -217,15 +264,25 @@ class LocalFolder extends Folder {
     @Override
     public int getMessageCount() throws MessagingException {
         if (!isOpen) {
-            // Count only directories with message.properties
-            File[] messageDirs = directory.listFiles(file ->
-                    file.isDirectory() &&
-                            !file.getName().startsWith(".") &&
-                            !file.getName().equals("attachments") &&
-                            new File(file, "message.properties").exists()
-            );
-
-            return messageDirs != null ? messageDirs.length : 0;
+            // Count messages in the "messages" directory
+            File messagesDir = new File(directory, "messages");
+            if (messagesDir.exists() && messagesDir.isDirectory()) {
+                File[] messageDirs = messagesDir.listFiles(file ->
+                        file.isDirectory() &&
+                                !file.getName().startsWith(".") &&
+                                new File(file, "message.properties").exists()
+                );
+                return messageDirs != null ? messageDirs.length : 0;
+            } else {
+                // Check the old structure as a fallback
+                File[] directMessageDirs = directory.listFiles(file ->
+                        file.isDirectory() &&
+                                !file.getName().startsWith(".") &&
+                                !file.getName().equals("messages") &&
+                                new File(file, "message.properties").exists()
+                );
+                return directMessageDirs != null ? directMessageDirs.length : 0;
+            }
         }
 
         return messages.size();
@@ -274,26 +331,28 @@ class LocalFolder extends Folder {
 
         // If messages list is empty, reload the messages from the directory
         // This can happen if folder was opened but messages weren't loaded properly
-        File[] messageDirs = directory.listFiles(file ->
-                file.isDirectory() &&
-                        !file.getName().startsWith(".") &&
-                        !file.getName().equals("attachments") &&
-                        new File(file, "message.properties").exists()
-        );
+        File messagesDir = new File(directory, "messages");
+        if (messagesDir.exists() && messagesDir.isDirectory()) {
+            File[] messageDirs = messagesDir.listFiles(file ->
+                    file.isDirectory() &&
+                            !file.getName().startsWith(".") &&
+                            new File(file, "message.properties").exists()
+            );
 
-        if (messageDirs != null) {
-            for (File messageDir : messageDirs) {
-                try {
-                    LocalMessage message = new LocalMessage(this, messageDir);
-                    messages.add(message);
-                } catch (Exception e) {
-                    // Log the error but continue with other messages
-                    System.err.println("Error loading message from " + messageDir.getPath() + ": " + e.getMessage());
+            if (messageDirs != null) {
+                for (File messageDir : messageDirs) {
+                    try {
+                        LocalMessage message = new LocalMessage(this, messageDir);
+                        messages.add(message);
+                    } catch (Exception e) {
+                        // Log the error but continue with other messages
+                        LOGGER.log(Level.WARNING, "Error loading message from " + messageDir.getPath() + ": " + e.getMessage());
+                    }
                 }
-            }
 
-            // Sort messages by date if possible
-            messages.sort(Comparator.comparing(LocalMessage::getReceivedDate, Comparator.nullsLast(Comparator.naturalOrder())));
+                // Sort messages by date if possible
+                messages.sort(Comparator.comparing(LocalMessage::getReceivedDate, Comparator.nullsLast(Comparator.naturalOrder())));
+            }
         }
 
         return messages.toArray(new Message[0]);

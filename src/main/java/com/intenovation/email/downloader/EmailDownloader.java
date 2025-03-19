@@ -20,47 +20,48 @@ import java.util.logging.Logger;
 
 /**
  * Handles downloading emails from IMAP server
+ * Refactored to use a "messages" subfolder for storing individual messages
  */
 public class EmailDownloader {
     private static final Logger LOGGER = Logger.getLogger(EmailDownloader.class.getName());
-    
+
     /**
      * Download all emails from the IMAP server
-     * 
+     *
      * @param progressUpdater Function to report progress
      * @param statusUpdater Function to report status
      * @return Status message
      * @throws InterruptedException if task is cancelled
      */
-    public static String downloadAllEmails(Consumer<Integer> progressUpdater, Consumer<String> statusUpdater) 
+    public static String downloadAllEmails(Consumer<Integer> progressUpdater, Consumer<String> statusUpdater)
             throws InterruptedException {
         return downloadEmails(progressUpdater, statusUpdater, false);
     }
-    
+
     /**
      * Download only new emails from the IMAP server
-     * 
+     *
      * @param progressUpdater Function to report progress
      * @param statusUpdater Function to report status
      * @return Status message
      * @throws InterruptedException if task is cancelled
      */
-    public static String downloadNewEmails(Consumer<Integer> progressUpdater, Consumer<String> statusUpdater) 
+    public static String downloadNewEmails(Consumer<Integer> progressUpdater, Consumer<String> statusUpdater)
             throws InterruptedException {
         return downloadEmails(progressUpdater, statusUpdater, true);
     }
-    
+
     /**
      * Download emails from the IMAP server
-     * 
+     *
      * @param progressUpdater Function to report progress
      * @param statusUpdater Function to report status
      * @param newOnly Whether to download only new emails
      * @return Status message
      * @throws InterruptedException if task is cancelled
      */
-    private static String downloadEmails(Consumer<Integer> progressUpdater, Consumer<String> statusUpdater, 
-                                        boolean newOnly) throws InterruptedException {
+    private static String downloadEmails(Consumer<Integer> progressUpdater, Consumer<String> statusUpdater,
+                                         boolean newOnly) throws InterruptedException {
         // Get settings from ImapDownloader
         String imapHost = ImapDownloader.getImapHost();
         String imapPort = ImapDownloader.getImapPort();
@@ -68,20 +69,20 @@ public class EmailDownloader {
         String password = ImapDownloader.getPassword();
         boolean useSSL = ImapDownloader.isUseSSL();
         String storagePath = ImapDownloader.getStoragePath();
-        
+
         statusUpdater.accept("Connecting to IMAP server " + imapHost + "...");
         progressUpdater.accept(0);
-        
+
         // Create the base directory if it doesn't exist
         File baseDir = new File(storagePath);
         if (!baseDir.exists()) {
             baseDir.mkdirs();
         }
-        
+
         // Create .lastSync file to track last sync time
         File lastSyncFile = new File(baseDir, ".lastSync");
         Date lastSyncDate = null;
-        
+
         if (newOnly && lastSyncFile.exists()) {
             try {
                 String dateString = Files.readAllLines(lastSyncFile.toPath()).get(0);
@@ -95,7 +96,7 @@ public class EmailDownloader {
                 statusUpdater.accept("Last sync date not available, downloading all new emails");
             }
         }
-        
+
         try {
             // Set up connection properties
             Properties props = new Properties();
@@ -104,34 +105,34 @@ public class EmailDownloader {
             props.put("mail.imaps.port", imapPort);
             props.put("mail.imaps.ssl.enable", String.valueOf(useSSL));
             props.put("mail.imaps.ssl.trust", "*");
-            
+
             // Create the session
             Session session = Session.getInstance(props);
-            
+
             // Connect to the server
             Store store = session.getStore("imaps");
             store.connect(imapHost, username, password);
-            
+
             // Get the default folder
             Folder defaultFolder = store.getDefaultFolder();
-            
+
             // Check for interruption
             if (Thread.currentThread().isInterrupted()) {
                 store.close();
                 throw new InterruptedException("Task cancelled");
             }
-            
+
             // Get all folders
             Folder[] folders = defaultFolder.list();
             int totalFolders = folders.length;
-            
+
             statusUpdater.accept("Found " + totalFolders + " folders");
             progressUpdater.accept(5);
-            
+
             int processedFolders = 0;
             int totalEmails = 0;
             int downloadedEmails = 0;
-            
+
             // First pass to count total emails
             if (!newOnly) { // Only count for full sync
                 statusUpdater.accept("Counting emails...");
@@ -140,7 +141,7 @@ public class EmailDownloader {
                     if ((folder.getType() & Folder.HOLDS_MESSAGES) == 0) {
                         continue;
                     }
-                    
+
                     try {
                         folder.open(Folder.READ_ONLY);
                         totalEmails += folder.getMessageCount();
@@ -148,7 +149,7 @@ public class EmailDownloader {
                     } catch (MessagingException e) {
                         LOGGER.log(Level.WARNING, "Error counting messages in folder: " + folder.getName(), e);
                     }
-                    
+
                     // Check for interruption
                     if (Thread.currentThread().isInterrupted()) {
                         store.close();
@@ -156,31 +157,37 @@ public class EmailDownloader {
                     }
                 }
             }
-            
+
             // Process each folder
             for (Folder folder : folders) {
                 // Skip non-selectable folders
                 if ((folder.getType() & Folder.HOLDS_MESSAGES) == 0) {
                     continue;
                 }
-                
+
                 String folderName = folder.getFullName();
                 statusUpdater.accept("Processing folder: " + folderName);
-                
+
                 try {
                     // Open the folder
                     folder.open(Folder.READ_ONLY);
-                    
+
                     // Create folder directory
                     String folderPath = storagePath + File.separator + FileUtils.sanitizeFolderName(folderName);
                     File folderDir = new File(folderPath);
                     if (!folderDir.exists()) {
                         folderDir.mkdirs();
                     }
-                    
+
+                    // Create messages directory within folder
+                    File messagesDir = new File(folderDir, "messages");
+                    if (!messagesDir.exists()) {
+                        messagesDir.mkdirs();
+                    }
+
                     // Get messages from this folder
                     Message[] messages;
-                    
+
                     if (newOnly && lastSyncDate != null) {
                         // Get only messages since last sync
                         messages = folder.search(new ReceivedDateTerm(ComparisonTerm.GE, lastSyncDate));
@@ -188,22 +195,22 @@ public class EmailDownloader {
                         // Get all messages
                         messages = folder.getMessages();
                     }
-                    
+
                     if (messages.length > 0) {
                         statusUpdater.accept("Found " + messages.length + " emails in " + folderName);
                     }
-                    
+
                     // Process each message
                     for (int i = 0; i < messages.length; i++) {
                         Message message = messages[i];
-                        
+
                         // Check for interruption
                         if (Thread.currentThread().isInterrupted()) {
                             folder.close(false);
                             store.close();
                             throw new InterruptedException("Task cancelled");
                         }
-                        
+
                         try {
                             // Get message ID or fallback to a unique identifier
                             String messageId = getMessageId(message);
@@ -213,30 +220,30 @@ public class EmailDownloader {
                                 Date sentDate = message.getSentDate();
                                 if (subject == null) subject = "No Subject";
                                 if (sentDate == null) sentDate = new Date();
-                                
-                                messageId = folderName + "-" + 
-                                         new SimpleDateFormat("yyyyMMdd-HHmmss").format(sentDate) + "-" +
-                                         Math.abs(subject.hashCode());
+
+                                messageId = folderName + "-" +
+                                        new SimpleDateFormat("yyyyMMdd-HHmmss").format(sentDate) + "-" +
+                                        Math.abs(subject.hashCode());
                             }
-                            
-                            // Create message directory
-                            File msgDir = new File(folderDir, FileUtils.sanitizeFileName(messageId));
-                            
+
+                            // Create message directory inside the messages directory
+                            File msgDir = new File(messagesDir, FileUtils.sanitizeFileName(messageId));
+
                             // Skip if this message already exists and we're only getting new messages
                             if (msgDir.exists()) {
                                 continue;
                             }
-                            
+
                             msgDir.mkdirs();
-                            
+
                             // Save message content
                             saveMessageContent(msgDir, message);
-                            
+
                             // Save message properties
                             saveMessageProperties(msgDir, message);
-                            
+
                             downloadedEmails++;
-                            
+
                             // Update progress for full sync
                             if (!newOnly && totalEmails > 0) {
                                 int emailProgress = 5 + (90 * downloadedEmails / totalEmails);
@@ -245,21 +252,21 @@ public class EmailDownloader {
                                 // For new emails, use a simpler progress calculation
                                 progressUpdater.accept(5 + (90 * (i + 1) / Math.max(1, messages.length)));
                             }
-                            
+
                             // Update status message periodically
                             if (downloadedEmails % 10 == 0 || i == messages.length - 1) {
-                                statusUpdater.accept("Downloaded " + downloadedEmails + " emails (" + 
-                                                  (i + 1) + "/" + messages.length + " from " + folderName + ")");
+                                statusUpdater.accept("Downloaded " + downloadedEmails + " emails (" +
+                                        (i + 1) + "/" + messages.length + " from " + folderName + ")");
                             }
                         } catch (Exception e) {
                             LOGGER.log(Level.WARNING, "Error processing message", e);
                             // Continue with next message
                         }
                     }
-                    
+
                     // Close the folder
                     folder.close(false);
-                    
+
                 } catch (MessagingException e) {
                     LOGGER.log(Level.WARNING, "Error processing folder: " + folderName, e);
                     // Continue with next folder
