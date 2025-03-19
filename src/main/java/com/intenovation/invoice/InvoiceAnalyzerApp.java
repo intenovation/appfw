@@ -133,46 +133,8 @@ public class InvoiceAnalyzerApp {
     private List<BackgroundTask> createTasks() {
         List<BackgroundTask> tasks = new ArrayList<>();
 
-        // Create the invoice processor task with logging
-        final InvoiceProcessor processor = new InvoiceProcessor(emailDirectory, outputDirectory);
-
-        // Using BackgroundTaskImpl instead of SimpleTask
-        tasks.add(new BackgroundTask(
-                "Invoice Processor",
-                "Analyzes emails to extract invoice information",
-                processor.getIntervalSeconds(),
-                true,
-                // Task executor with logging
-                (callback) -> {
-                    // Log all progress and status updates
-                    LOGGER.info("Starting Invoice Processor task");
-
-                    // Create a wrapped callback that logs as well as updates
-                    ProgressStatusCallback loggingCallback = new ProgressStatusCallback() {
-                        @Override
-                        public void update(int percent, String message) {
-                            // First update the original callback
-                            callback.update(percent, message);
-
-                            // Then log the progress
-                            LOGGER.info(String.format("[Invoice Processor] %d%% - %s", percent, message));
-                        }
-                    };
-
-                    // Run the processor with our logging callback
-                    try {
-                        String result = processor.execute(loggingCallback);
-                        LOGGER.info("Invoice Processor completed: " + result);
-                        return result;
-                    } catch (InterruptedException e) {
-                        LOGGER.warning("Invoice Processor was interrupted");
-                        throw e;
-                    } catch (Exception e) {
-                        LOGGER.log(Level.SEVERE, "Invoice Processor error", e);
-                        return "Error: " + e.getMessage();
-                    }
-                }
-        ));
+        // Create the invoice processor that extends BackgroundTask
+        tasks.add(new InvoiceProcessor(emailDirectory, outputDirectory));
 
         return tasks;
     }

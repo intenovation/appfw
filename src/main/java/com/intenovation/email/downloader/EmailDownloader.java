@@ -1,5 +1,7 @@
 package com.intenovation.email.downloader;
 
+import com.intenovation.appfw.systemtray.*;
+
 import javax.mail.*;
 import javax.mail.search.ComparisonTerm;
 import javax.mail.search.ReceivedDateTerm;
@@ -10,53 +12,125 @@ import java.text.SimpleDateFormat;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Properties;
-import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Handles downloading emails from IMAP server
- * Refactored to use a "messages" subfolder for storing individual messages
+ * Refactored to extend BackgroundTask
  */
-public class EmailDownloader {
+public class EmailDownloader extends BackgroundTask {
     private static final Logger LOGGER = Logger.getLogger(EmailDownloader.class.getName());
+    private final boolean newOnly;
+
+    /**
+     * Create a new Email Downloader task for full sync
+     */
+    public EmailDownloader() {
+        this(false, "Full Email Sync", "Downloads all emails from the IMAP server", 3600 * 12);
+    }
+
+    /**
+     * Create a new Email Downloader task for new emails only
+     *
+     * @param syncIntervalMinutes Sync interval in minutes
+     */
+    public EmailDownloader(int syncIntervalMinutes) {
+        this(true, "New Emails Only", "Downloads only new emails since last check", syncIntervalMinutes * 60);
+    }
+
+    /**
+     * Private constructor with common initialization
+     *
+     * @param newOnly Whether to download only new emails
+     * @param name Task name
+     * @param description Task description
+     * @param intervalSeconds Interval in seconds
+     */
+    private EmailDownloader(boolean newOnly, String name, String description, int intervalSeconds) {
+        super(name, description, intervalSeconds, true, null); // We'll override execute() instead of providing an executor
+        this.newOnly = newOnly;
+    }
+
+    /**
+     * Execute the task with progress and status reporting
+     * Override the parent class method to implement our specific logic
+     *
+     * @param callback Callback for reporting progress and status messages
+     * @return Status message that will be displayed on completion
+     * @throws InterruptedException if the task is cancelled
+     */
+    @Override
+    public String execute(ProgressStatusCallback callback) throws InterruptedException {
+        LOGGER.info("Starting " + (newOnly ? "New Emails Sync" : "Full Email Sync"));
+
+        // Create a logging wrapper around the callback
+        ProgressStatusCallback loggingCallback = new ProgressStatusCallback() {
+            @Override
+            public void update(int percent, String message) {
+                // Update the original callback
+                callback.update(percent, message);
+
+                // Log the progress
+                LOGGER.info(String.format("[%s] %d%% - %s",
+                        (newOnly ? "New Emails Sync" : "Full Email Sync"),
+                        percent, message));
+            }
+        };
+
+        try {
+            // Execute the download with our logging callback
+            String result;
+            if (newOnly) {
+                result = downloadNewEmails(loggingCallback);
+            } else {
+                result = downloadAllEmails(loggingCallback);
+            }
+
+            LOGGER.info((newOnly ? "New Emails Sync" : "Full Email Sync") + " completed: " + result);
+            return result;
+        } catch (InterruptedException e) {
+            LOGGER.warning((newOnly ? "New Emails Sync" : "Full Email Sync") + " was interrupted");
+            throw e;
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, (newOnly ? "New Emails Sync" : "Full Email Sync") + " error", e);
+            return "Error: " + e.getMessage();
+        }
+    }
 
     /**
      * Download all emails from the IMAP server
      *
      * @param progressUpdater Function to report progress
-     * @param statusUpdater Function to report status
      * @return Status message
      * @throws InterruptedException if task is cancelled
      */
-    public static String downloadAllEmails(Consumer<Integer> progressUpdater, Consumer<String> statusUpdater)
+    public static String downloadAllEmails(ProgressStatusCallback progressUpdater)
             throws InterruptedException {
-        return downloadEmails(progressUpdater, statusUpdater, false);
+        return downloadEmails(progressUpdater, false);
     }
 
     /**
      * Download only new emails from the IMAP server
      *
      * @param progressUpdater Function to report progress
-     * @param statusUpdater Function to report status
      * @return Status message
      * @throws InterruptedException if task is cancelled
      */
-    public static String downloadNewEmails(Consumer<Integer> progressUpdater, Consumer<String> statusUpdater)
+    public static String downloadNewEmails(ProgressStatusCallback progressUpdater)
             throws InterruptedException {
-        return downloadEmails(progressUpdater, statusUpdater, true);
+        return downloadEmails(progressUpdater, true);
     }
 
     /**
      * Download emails from the IMAP server
      *
      * @param progressUpdater Function to report progress
-     * @param statusUpdater Function to report status
      * @param newOnly Whether to download only new emails
      * @return Status message
      * @throws InterruptedException if task is cancelled
      */
-    private static String downloadEmails(Consumer<Integer> progressUpdater, Consumer<String> statusUpdater,
+    private static String downloadEmails(ProgressStatusCallback progressUpdater,
                                          boolean newOnly) throws InterruptedException {
         // Get settings from ImapDownloader
         String imapHost = ImapDownloader.getImapHost();
@@ -66,8 +140,7 @@ public class EmailDownloader {
         boolean useSSL = ImapDownloader.isUseSSL();
         String storagePath = ImapDownloader.getStoragePath();
 
-        statusUpdater.accept("Connecting to IMAP server " + imapHost + "...");
-        progressUpdater.accept(0);
+        progressUpdater.update(0, "Connecting to IMAP server " + imapHost + "...");
 
         // Create the base directory if it doesn't exist
         File baseDir = new File(storagePath);
@@ -84,12 +157,12 @@ public class EmailDownloader {
                 String dateString = Files.readAllLines(lastSyncFile.toPath()).get(0);
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
                 lastSyncDate = sdf.parse(dateString);
-                statusUpdater.accept("Downloading emails since " + dateString);
+                progressUpdater.update(5, "Downloading emails since " + dateString);
             } catch (Exception e) {
                 LOGGER.log(Level.WARNING, "Error reading last sync date", e);
                 // Continue without last sync date
                 lastSyncDate = null;
-                statusUpdater.accept("Last sync date not available, downloading all new emails");
+                progressUpdater.update(5, "Last sync date not available, downloading all new emails");
             }
         }
 
@@ -122,8 +195,7 @@ public class EmailDownloader {
             Folder[] folders = defaultFolder.list();
             int totalFolders = folders.length;
 
-            statusUpdater.accept("Found " + totalFolders + " folders");
-            progressUpdater.accept(5);
+            progressUpdater.update(5, "Found " + totalFolders + " folders");
 
             int processedFolders = 0;
             int totalEmails = 0;
@@ -131,7 +203,7 @@ public class EmailDownloader {
 
             // First pass to count total emails
             if (!newOnly) { // Only count for full sync
-                statusUpdater.accept("Counting emails...");
+                progressUpdater.update(15, "Counting emails...");
                 for (Folder folder : folders) {
                     // Skip non-selectable folders
                     if ((folder.getType() & Folder.HOLDS_MESSAGES) == 0) {
@@ -162,7 +234,7 @@ public class EmailDownloader {
                 }
 
                 String folderName = folder.getFullName();
-                statusUpdater.accept("Processing folder: " + folderName);
+                progressUpdater.update(20, "Processing folder: " + folderName);
 
                 try {
                     // Open the folder
@@ -193,7 +265,7 @@ public class EmailDownloader {
                     }
 
                     if (messages.length > 0) {
-                        statusUpdater.accept("Found " + messages.length + " emails in " + folderName);
+                        progressUpdater.update(30, "Found " + messages.length + " emails in " + folderName);
                     }
 
                     // Process each message
@@ -243,16 +315,17 @@ public class EmailDownloader {
                             // Update progress for full sync
                             if (!newOnly && totalEmails > 0) {
                                 int emailProgress = 5 + (90 * downloadedEmails / totalEmails);
-                                progressUpdater.accept(Math.min(95, emailProgress));
+                                progressUpdater.update(Math.min(95, emailProgress),"Downloading");
                             } else {
                                 // For new emails, use a simpler progress calculation
-                                progressUpdater.accept(5 + (90 * (i + 1) / Math.max(1, messages.length)));
+                                progressUpdater.update(5 + (90 * (i + 1) / Math.max(1, messages.length)),"Downloading");
                             }
 
                             // Update status message periodically
                             if (downloadedEmails % 10 == 0 || i == messages.length - 1) {
-                                statusUpdater.accept("Downloaded " + downloadedEmails + " emails (" +
-                                        (i + 1) + "/" + messages.length + " from " + folderName + ")");
+                                progressUpdater.update(5 + (90 * (i + 1) / Math.max(1, messages.length)),
+                                        "Downloaded " + downloadedEmails + " emails (" +
+                                                (i + 1) + "/" + messages.length + " from " + folderName + ")");
                             }
                         } catch (Exception e) {
                             LOGGER.log(Level.WARNING, "Error processing message", e);
@@ -271,7 +344,7 @@ public class EmailDownloader {
                 processedFolders++;
                 int folderProgress = 5 + (90 * processedFolders / totalFolders);
                 if (downloadedEmails == 0) { // Only update if no emails were downloaded
-                    progressUpdater.accept(Math.min(95, folderProgress));
+                    progressUpdater.update(Math.min(95, folderProgress),"Downloading");
                 }
             }
 
@@ -289,8 +362,7 @@ public class EmailDownloader {
             }
 
             // Finalizing
-            statusUpdater.accept("Finalizing download...");
-            progressUpdater.accept(100);
+            progressUpdater.update(95, "Finalizing download...");
 
             if (downloadedEmails == 0) {
                 return "No new emails to download.";

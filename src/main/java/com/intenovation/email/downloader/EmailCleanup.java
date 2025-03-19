@@ -1,34 +1,86 @@
 package com.intenovation.email.downloader;
 
+import com.intenovation.appfw.systemtray.*;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
  * Handles email archive cleanup and organization
- * Refactored to work with the new file structure that uses a "messages" folder
+ * Refactored to extend BackgroundTask
  */
-public class EmailCleanup {
+public class EmailCleanup extends BackgroundTask {
     private static final Logger LOGGER = Logger.getLogger(EmailCleanup.class.getName());
+
+    /**
+     * Create a new Email Cleanup task
+     *
+     * @param cleanupIntervalHours The cleanup interval in hours
+     */
+    public EmailCleanup(int cleanupIntervalHours) {
+        super(
+                "Email Cleanup",
+                "Cleans up and organizes the email archive",
+                cleanupIntervalHours * 3600, // Convert hours to seconds
+                true,                        // Available in menu
+                null                         // We'll override execute() instead of providing an executor
+        );
+    }
+
+    /**
+     * Execute the task with progress and status reporting
+     * Override the parent class method to implement our specific logic
+     *
+     * @param callback Callback for reporting progress and status messages
+     * @return Status message that will be displayed on completion
+     * @throws InterruptedException if the task is cancelled
+     */
+    @Override
+    public String execute(ProgressStatusCallback callback) throws InterruptedException {
+        LOGGER.info("Starting Email Cleanup");
+
+        // Create a logging wrapper around the callback
+        ProgressStatusCallback loggingCallback = new ProgressStatusCallback() {
+            @Override
+            public void update(int percent, String message) {
+                // Update the original callback
+                callback.update(percent, message);
+
+                // Log the progress
+                LOGGER.info(String.format("[Email Cleanup] %d%% - %s", percent, message));
+            }
+        };
+
+        try {
+            // Execute the cleanup with our logging callback
+            String result = cleanupEmailArchive(loggingCallback);
+            LOGGER.info("Email Cleanup completed: " + result);
+            return result;
+        } catch (InterruptedException e) {
+            LOGGER.warning("Email Cleanup was interrupted");
+            throw e;
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Email Cleanup error", e);
+            return "Error: " + e.getMessage();
+        }
+    }
 
     /**
      * Clean up and organize the email archive
      *
-     * @param progressUpdater Function to report progress
-     * @param statusUpdater Function to report status
+     * @param callback Callback for reporting progress and status
      * @return Status message
      * @throws InterruptedException if task is cancelled
      */
-    public static String cleanupEmailArchive(Consumer<Integer> progressUpdater, Consumer<String> statusUpdater)
+    public static String cleanupEmailArchive(ProgressStatusCallback callback)
             throws InterruptedException {
-        statusUpdater.accept("Starting email archive cleanup...");
-        progressUpdater.accept(0);
+        callback.update(0, "Starting email archive cleanup...");
 
         String storagePath = ImapDownloader.getStoragePath();
         File baseDir = new File(storagePath);
@@ -50,9 +102,8 @@ public class EmailCleanup {
             int duplicatesRemoved = 0;
             int emptyDirectoriesRemoved = 0;
 
-            statusUpdater.accept("Found " + totalFolders + " folders with approximately " +
+            callback.update(5, "Found " + totalFolders + " folders with approximately " +
                     totalEmails + " emails");
-            progressUpdater.accept(5);
 
             // Track message IDs to find duplicates
             Map<String, File> messageIds = new HashMap<>();
@@ -64,7 +115,7 @@ public class EmailCleanup {
                     continue;
                 }
 
-                statusUpdater.accept("Cleaning folder: " + folder.getName());
+                callback.update(10, "Cleaning folder: " + folder.getName());
 
                 // Check for interruption
                 if (Thread.currentThread().isInterrupted()) {
@@ -172,14 +223,15 @@ public class EmailCleanup {
                             // Update progress
                             if (totalEmails > 0) {
                                 int progress = 5 + (90 * processedEmails / totalEmails);
-                                progressUpdater.accept(Math.min(95, progress));
+                                callback.update(Math.min(95, progress)," processed Emails");
                             }
 
                             // Update status periodically
                             if (processedEmails % 50 == 0) {
-                                statusUpdater.accept("Processed " + processedEmails + " of ~" +
-                                        totalEmails + " emails. Removed " +
-                                        duplicatesRemoved + " duplicates.");
+                                callback.update(5 + (90 * processedEmails / Math.max(1, totalEmails)),
+                                        "Processed " + processedEmails + " of ~" +
+                                                totalEmails + " emails. Removed " +
+                                                duplicatesRemoved + " duplicates.");
                             }
 
                         } catch (IOException e) {
@@ -203,13 +255,12 @@ public class EmailCleanup {
                 processedFolders++;
                 if (totalEmails == 0) { // Only update based on folders if no emails
                     int progress = 5 + (90 * processedFolders / totalFolders);
-                    progressUpdater.accept(Math.min(95, progress));
+                    callback.update(Math.min(95, progress),"Downloading");
                 }
             }
 
             // Finalizing
-            statusUpdater.accept("Finalizing cleanup...");
-            progressUpdater.accept(95);
+            callback.update(95, "Finalizing cleanup...");
 
             // Remove empty directories one more time
             folders = baseDir.listFiles(File::isDirectory);
@@ -236,12 +287,12 @@ public class EmailCleanup {
             if (allFiles != null) {
                 int totalFiles = allFiles.length;
                 if (totalFiles > 10000) {
-                    statusUpdater.accept("Database is large (" + totalFiles + " files). " +
+                    callback.update(98, "Database is large (" + totalFiles + " files). " +
                             "Consider archiving older emails.");
                 }
             }
 
-            progressUpdater.accept(100);
+            callback.update(100, "Cleanup complete");
 
             return "Cleanup complete. Processed " + processedEmails + " emails in " +
                     processedFolders + " folders. Removed " + duplicatesRemoved +

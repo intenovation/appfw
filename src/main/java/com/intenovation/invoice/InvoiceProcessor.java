@@ -60,6 +60,14 @@ public class InvoiceProcessor extends BackgroundTask {
     }
 
     /**
+     * Get the interval in seconds for this task
+     * @return Interval in seconds
+     */
+    public int getIntervalSeconds() {
+        return 2 * 60 * 60; // 2 hours
+    }
+
+    /**
      * Execute the task with progress and status reporting
      * Override the parent class method to implement our specific logic
      *
