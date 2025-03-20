@@ -382,7 +382,7 @@ public class InvoiceProcessor extends BackgroundTask {
                 String amountStr = amountMatcher.group(2).replace(",", ".");
                 invoice.setAmount(Double.parseDouble(amountStr));
             } catch (NumberFormatException e) {
-                LOGGER.log(Level.WARNING, "Failed to parse amount", e);
+                LOGGER.log(Level.WARNING, "Failed to parse amount "+amountMatcher.group(2) , e);
             }
         }
 

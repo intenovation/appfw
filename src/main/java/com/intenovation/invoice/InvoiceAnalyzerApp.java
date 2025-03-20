@@ -41,8 +41,18 @@ public class InvoiceAnalyzerApp {
     }
 
     /**
-     * Initialize the application
+     * Set the system tray app instance to use
+     * @param systemTrayApp The system tray app instance
      */
+    public void setSystemTrayApp(SystemTrayApp systemTrayApp) {
+        this.systemTrayApp = systemTrayApp;
+    }
+
+    /**
+     * Initialize the application
+     * @deprecated Use setSystemTrayApp instead and let AppBootstrapper manage the system tray
+     */
+    @Deprecated
     public void initialize() {
         try {
             // Create the directories if they don't exist
@@ -53,18 +63,8 @@ public class InvoiceAnalyzerApp {
                 config.getOutputDirectory().mkdirs();
             }
 
-            // Create app configuration
-            AppConfig appConfig = createAppConfig();
-
-            // Create menu categories
-            List<MenuCategory> menuCategories = createMenuCategories();
-
-            // Create tasks
-            List<BackgroundTask> tasks = createTasks();
-
-            // Create the system tray app
-            systemTrayApp = new SystemTrayApp(appConfig, menuCategories, tasks);
-            LOGGER.info("Invoice Analyzer started");
+            // This part is no longer needed as the system tray is managed by AppBootstrapper
+            LOGGER.warning("Called deprecated initialize() method. The system tray is now managed by AppBootstrapper.");
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Application startup failed", e);
             uiService.showError("Error", "Failed to start: " + e.getMessage());
@@ -73,7 +73,9 @@ public class InvoiceAnalyzerApp {
 
     /**
      * Create application configuration
+     * @deprecated Use the AppBootstrapper's createAppConfig method instead
      */
+    @Deprecated
     private AppConfig createAppConfig() {
         return new AppConfig() {
             @Override
@@ -95,7 +97,9 @@ public class InvoiceAnalyzerApp {
 
     /**
      * Create menu categories
+     * @deprecated Use the AppBootstrapper's createCombinedMenu method instead
      */
+    @Deprecated
     private List<MenuCategory> createMenuCategories() {
         List<MenuCategory> categories = new ArrayList<>();
 
@@ -108,7 +112,7 @@ public class InvoiceAnalyzerApp {
 
         // Actions category
         CategoryBuilder actionsBuilder = new CategoryBuilder("Actions");
-        actionsBuilder.addAction("Run Invoice Analysis Now", () -> systemTrayApp.startTask("Invoice Processor"));
+        actionsBuilder.addAction("Run Invoice Analysis Now", () -> runInvoiceAnalysisNow());
         actionsBuilder.addAction("Generate Sample Invoice", this::generateSampleInvoice);
         categories.add(actionsBuilder.build());
 
@@ -122,7 +126,9 @@ public class InvoiceAnalyzerApp {
 
     /**
      * Create tasks
+     * @deprecated Use the AppBootstrapper's createCombinedTasks method instead
      */
+    @Deprecated
     private List<BackgroundTask> createTasks() {
         List<BackgroundTask> tasks = new ArrayList<>();
 
@@ -136,20 +142,35 @@ public class InvoiceAnalyzerApp {
      * Show the status dialog
      */
     private void showStatusDialog() {
-        systemTrayApp.showTaskStatus();
+        if (systemTrayApp != null) {
+            systemTrayApp.showTaskStatus();
+        } else {
+            LOGGER.warning("Cannot show status dialog: systemTrayApp is not set");
+        }
+    }
+
+    /**
+     * Run invoice analysis
+     */
+    public void runInvoiceAnalysisNow() {
+        if (systemTrayApp != null) {
+            systemTrayApp.startTask("Invoice Processor");
+        } else {
+            LOGGER.warning("Cannot run invoice analysis: systemTrayApp is not set");
+        }
     }
 
     /**
      * Show the configuration dialog
      */
-    private boolean showConfigDialog() {
+    public boolean showConfigDialog() {
         return uiService.showConfigDialog("Invoice Analyzer Configuration", config);
     }
 
     /**
      * Open the email directory
      */
-    private void openEmailDirectory() {
+    public void openEmailDirectory() {
         if (!uiService.openDirectory(config.getEmailDirectory())) {
             uiService.showError("Error", "Could not open email directory: " +
                     config.getEmailDirectory().getAbsolutePath());
@@ -159,7 +180,7 @@ public class InvoiceAnalyzerApp {
     /**
      * Open the reports directory
      */
-    private void openReportsDirectory() {
+    public void openReportsDirectory() {
         if (!uiService.openDirectory(config.getOutputDirectory())) {
             uiService.showError("Error", "Could not open reports directory: " +
                     config.getOutputDirectory().getAbsolutePath());
@@ -169,7 +190,7 @@ public class InvoiceAnalyzerApp {
     /**
      * Show the about dialog
      */
-    private void showAboutDialog() {
+    public void showAboutDialog() {
         uiService.showInfo("About " + APP_NAME,
                 APP_NAME + " Version " + VERSION + "\n\n" +
                         "Automatic invoice detection and processing from email archives.\n\n" +
@@ -180,7 +201,7 @@ public class InvoiceAnalyzerApp {
     /**
      * Generate a sample invoice (for testing)
      */
-    private void generateSampleInvoice() {
+    public void generateSampleInvoice() {
         // Create a sample email with invoice content
         try {
             // Create a directory for the sample

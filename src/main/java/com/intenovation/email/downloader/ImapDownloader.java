@@ -46,7 +46,7 @@ public class ImapDownloader {
 
     /**
      * Create a new ImapDownloader
-     * 
+     *
      * @param config Email configuration
      * @param uiService UI service
      */
@@ -56,8 +56,18 @@ public class ImapDownloader {
     }
 
     /**
-     * Initialize the system tray application
+     * Set the system tray app instance to use
+     * @param systemTrayApp The system tray app instance
      */
+    public void setSystemTrayApp(SystemTrayApp systemTrayApp) {
+        this.systemTrayApp = systemTrayApp;
+    }
+
+    /**
+     * Initialize the system tray application
+     * @deprecated Use setSystemTrayApp instead and let AppBootstrapper manage the system tray
+     */
+    @Deprecated
     public void initialize() {
         try {
             if (config.getImapHost().isEmpty() || config.getUsername().isEmpty() || config.getPassword().isEmpty()) {
@@ -68,19 +78,8 @@ public class ImapDownloader {
                 }
             }
 
-            // Define application configuration
-            AppConfig appConfig = createAppConfig();
-
-            // Create menu categories
-            List<MenuCategory> menuCategories = createMenuCategories();
-
-            // Create background tasks
-            List<BackgroundTask> tasks = createTasks();
-
-            // Initialize the system tray application
-            systemTrayApp = new SystemTrayApp(appConfig, menuCategories, tasks);
-            LOGGER.info("IMAP Email Downloader started");
-
+            // This part is no longer needed as the system tray is managed by AppBootstrapper
+            LOGGER.warning("Called deprecated initialize() method. The system tray is now managed by AppBootstrapper.");
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Failed to start application", e);
             uiService.showError("Error", "Failed to start application: " + e.getMessage());
@@ -90,7 +89,9 @@ public class ImapDownloader {
     /**
      * Create the application configuration
      * @return The app config
+     * @deprecated Use the AppBootstrapper's createAppConfig method instead
      */
+    @Deprecated
     private AppConfig createAppConfig() {
         return new AppConfig() {
             @Override
@@ -113,7 +114,9 @@ public class ImapDownloader {
     /**
      * Create the menu categories for the application
      * @return The menu categories
+     * @deprecated Use the AppBootstrapper's createCombinedMenu method instead
      */
+    @Deprecated
     private List<MenuCategory> createMenuCategories() {
         List<MenuCategory> categories = new ArrayList<>();
 
@@ -142,7 +145,9 @@ public class ImapDownloader {
     /**
      * Create the background tasks for the application
      * @return The tasks
+     * @deprecated Use the AppBootstrapper's createCombinedTasks method instead
      */
+    @Deprecated
     private List<BackgroundTask> createTasks() {
         List<BackgroundTask> tasks = new ArrayList<>();
 
@@ -172,15 +177,19 @@ public class ImapDownloader {
     private void syncAllEmailsNow() {
         if (systemTrayApp != null) {
             systemTrayApp.startTask("Full Email Sync");
+        } else {
+            LOGGER.warning("Cannot sync emails: systemTrayApp is not set");
         }
     }
 
     /**
      * Trigger a new emails only sync
      */
-    private void syncNewEmailsNow() {
+    public void syncNewEmailsNow() {
         if (systemTrayApp != null) {
             systemTrayApp.startTask("New Emails Only");
+        } else {
+            LOGGER.warning("Cannot sync emails: systemTrayApp is not set");
         }
     }
 
@@ -190,13 +199,15 @@ public class ImapDownloader {
     private void cleanupNow() {
         if (systemTrayApp != null) {
             systemTrayApp.startTask("Email Cleanup");
+        } else {
+            LOGGER.warning("Cannot cleanup emails: systemTrayApp is not set");
         }
     }
 
     /**
      * Open the email archive directory
      */
-    private void openEmailArchive() {
+    public void openEmailArchive() {
         File archiveDir = config.getEmailDirectory();
         if (!archiveDir.exists()) {
             archiveDir.mkdirs();
@@ -210,7 +221,7 @@ public class ImapDownloader {
     /**
      * Open the log file
      */
-    private void openLogFile() {
+    public void openLogFile() {
         File logFile = new File(System.getProperty("user.home"), ".imap-downloader/imap-downloader.log");
         if (!logFile.exists()) {
             uiService.showInfo("Info", "No log file exists yet");
@@ -225,7 +236,7 @@ public class ImapDownloader {
     /**
      * Check the IMAP server status
      */
-    private void checkServerStatus() {
+    public void checkServerStatus() {
         uiService.showInfo("Checking Server", "Connecting to server...");
 
         // Create a background thread to avoid freezing the UI
@@ -274,7 +285,7 @@ public class ImapDownloader {
     /**
      * Show storage usage information
      */
-    private void showStorageUsage() {
+    public void showStorageUsage() {
         File archiveDir = config.getEmailDirectory();
         if (!archiveDir.exists()) {
             uiService.showInfo("Storage Info", "Email archive directory doesn't exist yet");
@@ -302,7 +313,7 @@ public class ImapDownloader {
     /**
      * Show the about dialog
      */
-    private void showAboutDialog() {
+    public void showAboutDialog() {
         uiService.showInfo("About " + APP_NAME,
                 APP_NAME + " " + VERSION + "\n\n" +
                         "A utility to download and archive emails from an IMAP server.\n\n" +
@@ -312,7 +323,7 @@ public class ImapDownloader {
     /**
      * Show a summary of the email archive status
      */
-    private void showStatusSummary() {
+    public void showStatusSummary() {
         File archiveDir = config.getEmailDirectory();
         int folderCount = 0;
         int emailCount = 0;
@@ -336,36 +347,36 @@ public class ImapDownloader {
 
     // Static accessors required by the existing code
     // These will be used by other classes during migration
-    public static String getImapHost() { 
-        return ImapDownloaderInstance.getInstance().config.getImapHost(); 
+    public static String getImapHost() {
+        return ImapDownloaderInstance.getInstance().config.getImapHost();
     }
-    
-    public static String getImapPort() { 
-        return ImapDownloaderInstance.getInstance().config.getImapPort(); 
+
+    public static String getImapPort() {
+        return ImapDownloaderInstance.getInstance().config.getImapPort();
     }
-    
-    public static String getUsername() { 
-        return ImapDownloaderInstance.getInstance().config.getUsername(); 
+
+    public static String getUsername() {
+        return ImapDownloaderInstance.getInstance().config.getUsername();
     }
-    
-    public static String getPassword() { 
-        return ImapDownloaderInstance.getInstance().config.getPassword(); 
+
+    public static String getPassword() {
+        return ImapDownloaderInstance.getInstance().config.getPassword();
     }
-    
-    public static boolean isUseSSL() { 
-        return ImapDownloaderInstance.getInstance().config.isUseSSL(); 
+
+    public static boolean isUseSSL() {
+        return ImapDownloaderInstance.getInstance().config.isUseSSL();
     }
-    
-    public static String getStoragePath() { 
-        return ImapDownloaderInstance.getInstance().config.getStoragePath(); 
+
+    public static String getStoragePath() {
+        return ImapDownloaderInstance.getInstance().config.getStoragePath();
     }
-    
+
     /**
      * Singleton holder for migration
      */
-    private static class ImapDownloaderInstance {
+    public static class ImapDownloaderInstance {
         private static ImapDownloader INSTANCE;
-        
+
         public static ImapDownloader getInstance() {
             if (INSTANCE == null) {
                 // Create a temporary instance with default configuration
@@ -374,7 +385,7 @@ public class ImapDownloader {
             }
             return INSTANCE;
         }
-        
+
         public static void setInstance(ImapDownloader instance) {
             INSTANCE = instance;
         }
