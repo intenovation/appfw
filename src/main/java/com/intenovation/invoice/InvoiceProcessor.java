@@ -2,6 +2,7 @@ package com.intenovation.invoice;
 
 import com.intenovation.appfw.systemtray.BackgroundTask;
 import com.intenovation.appfw.systemtray.ProgressStatusCallback;
+import com.intenovation.appfw.ui.UIService;
 import com.intenovation.email.reader.LocalMail;
 
 import javax.mail.*;
@@ -29,12 +30,35 @@ public class InvoiceProcessor extends BackgroundTask {
     private static final Pattern DATE_PATTERN = Pattern.compile("(?i)(date|datum)[\\s:]*([0-9]{1,2}[\\s./\\-][0-9]{1,2}[\\s./\\-][0-9]{2,4})");
     private static final Pattern DUE_DATE_PATTERN = Pattern.compile("(?i)(due date|fällig|zahlbar bis)[\\s:]*([0-9]{1,2}[\\s./\\-][0-9]{1,2}[\\s./\\-][0-9]{2,4})");
 
-    // Settings
-    private final File emailDirectory;
-    private final File outputDirectory;
+    // Configuration
+    private final InvoiceConfiguration config;
+    private final UIService uiService;
 
     /**
-     * Create a new invoice processor task
+     * Create a new invoice processor task with dependencies
+     *
+     * @param config The invoice configuration
+     * @param uiService The UI service
+     */
+    public InvoiceProcessor(InvoiceConfiguration config, UIService uiService) {
+        super(
+                "Invoice Processor",
+                "Processes emails to extract invoice information",
+                config.getProcessingIntervalHours() * 60 * 60, // Convert hours to seconds
+                true         // Available in menu
+        );
+
+        this.config = config;
+        this.uiService = uiService;
+
+        // Create output directory if it doesn't exist
+        if (!config.getOutputDirectory().exists()) {
+            config.getOutputDirectory().mkdirs();
+        }
+    }
+
+    /**
+     * Create a new invoice processor task (legacy constructor for backward compatibility)
      *
      * @param emailDirectory The directory containing downloaded emails
      * @param outputDirectory The directory to save invoice reports
@@ -47,8 +71,17 @@ public class InvoiceProcessor extends BackgroundTask {
                 true         // Available in menu
         );
 
-        this.emailDirectory = emailDirectory;
-        this.outputDirectory = outputDirectory;
+        // Create a configuration with the provided directories
+        this.config = new InvoiceConfiguration();
+        
+        // Apply the directories to the configuration
+        Map<String, Object> configValues = new HashMap<>();
+        configValues.put("emailDirectory", emailDirectory);
+        configValues.put("outputDirectory", outputDirectory);
+        config.applyConfiguration(configValues);
+        
+        // No UI service available with this constructor
+        this.uiService = null;
 
         // Create output directory if it doesn't exist
         if (!outputDirectory.exists()) {
@@ -72,9 +105,9 @@ public class InvoiceProcessor extends BackgroundTask {
 
         try {
             // Step 1: Open the local mail store
-            callback.update(5, "Opening local mail store " + emailDirectory);
+            callback.update(5, "Opening local mail store " + config.getEmailDirectory());
 
-            store = LocalMail.openStore(emailDirectory);
+            store = LocalMail.openStore(config.getEmailDirectory());
             callback.update(10, "Connected to local email store");
 
             // Step 2: Get the root folder and check if it holds messages
@@ -127,9 +160,6 @@ public class InvoiceProcessor extends BackgroundTask {
                         try {
                             if (isPotentialInvoice(message)) {
                                 potentialInvoiceMessages.add(message);
-                            }
-                            else {
-                                LOGGER.log(Level.FINE, "Rejecting message", message);
                             }
                         } catch (Exception e) {
                             LOGGER.log(Level.WARNING, "Error checking message", e);
@@ -390,7 +420,7 @@ public class InvoiceProcessor extends BackgroundTask {
         String timestamp = sdf.format(new Date());
 
         // CSV file for all invoices
-        File csvFile = new File(outputDirectory, "invoices_" + timestamp + ".tsv");
+        File csvFile = new File(config.getOutputDirectory(), "invoices_" + timestamp + ".tsv");
 
         try (FileWriter writer = new FileWriter(csvFile)) {
             // Write header
@@ -403,7 +433,7 @@ public class InvoiceProcessor extends BackgroundTask {
         }
 
         // Summary report with statistics
-        File summaryFile = new File(outputDirectory, "summary_" + timestamp + ".txt");
+        File summaryFile = new File(config.getOutputDirectory(), "summary_" + timestamp + ".txt");
 
         try (FileWriter writer = new FileWriter(summaryFile)) {
             writer.write("Invoice Analysis Summary\n");
