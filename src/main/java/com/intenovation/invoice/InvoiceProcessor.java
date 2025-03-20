@@ -379,10 +379,12 @@ public class InvoiceProcessor extends BackgroundTask {
         Matcher amountMatcher = AMOUNT_PATTERN.matcher(content);
         if (amountMatcher.find()) {
             try {
-                String amountStr = amountMatcher.group(2).replace(",", ".");
-                invoice.setAmount(Double.parseDouble(amountStr));
+                String amountStr = amountMatcher.group(2);
+                // Smart parsing of amount that handles both German and American formats
+                double amount = parseAmount(amountStr);
+                invoice.setAmount(amount);
             } catch (NumberFormatException e) {
-                LOGGER.log(Level.WARNING, "Failed to parse amount "+amountMatcher.group(2) , e);
+                LOGGER.log(Level.WARNING, "Failed to parse amount: " + amountMatcher.group(2), e);
             }
         }
 
@@ -409,6 +411,58 @@ public class InvoiceProcessor extends BackgroundTask {
         if (dueDateMatcher.find()) {
             invoice.setDueDate(dueDateMatcher.group(2));
         }
+    }
+
+    /**
+     * Parse an amount string that could be in either German or American format
+     * German format: 1.234,56 (. for thousands, , for decimal)
+     * American format: 1,234.56 (, for thousands, . for decimal)
+     *
+     * @param amountStr The amount string to parse
+     * @return The parsed amount as a double
+     */
+    private double parseAmount(String amountStr) {
+        // Remove any currency symbols and whitespace
+        amountStr = amountStr.replaceAll("[$€£\\s]", "");
+        if (amountStr.endsWith(".")){
+            LOGGER.warning(amountStr);
+            amountStr=amountStr.substring(0,amountStr.length()-1);
+            LOGGER.warning(amountStr);
+        }
+        // If empty after cleaning, return 0
+        if (amountStr.isEmpty()) {
+            return 0.0;
+        }
+
+        // Check if this is likely a German format number (contains comma but no period,
+        // or the last separator is a comma)
+        boolean isGermanFormat = false;
+
+        // If it has a comma but no period, it's German format
+        if (amountStr.contains(",") && !amountStr.contains(".")) {
+            isGermanFormat = true;
+        }
+        // If it has both comma and period, look at the positions
+        else if (amountStr.contains(",") && amountStr.contains(".")) {
+            int lastCommaPos = amountStr.lastIndexOf(",");
+            int lastPeriodPos = amountStr.lastIndexOf(".");
+
+            // If the last separator is a comma, it's likely German format
+            // (e.g., 1.234,56)
+            isGermanFormat = lastCommaPos > lastPeriodPos;
+        }
+
+        // Convert to a parseable format
+        if (isGermanFormat) {
+            // German format: Remove all periods and replace comma with period
+            amountStr = amountStr.replace(".", "").replace(",", ".");
+        } else {
+            // American format: Remove all commas
+            amountStr = amountStr.replace(",", "");
+        }
+
+        // Parse the formatted string
+        return Double.parseDouble(amountStr);
     }
 
     /**
