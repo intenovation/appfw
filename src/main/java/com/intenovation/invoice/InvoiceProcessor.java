@@ -73,13 +73,13 @@ public class InvoiceProcessor extends BackgroundTask {
 
         // Create a configuration with the provided directories
         this.config = new InvoiceConfiguration();
-        
+
         // Apply the directories to the configuration
         Map<String, Object> configValues = new HashMap<>();
         configValues.put("emailDirectory", emailDirectory);
         configValues.put("outputDirectory", outputDirectory);
         config.applyConfiguration(configValues);
-        
+
         // No UI service available with this constructor
         this.uiService = null;
 
@@ -279,9 +279,51 @@ public class InvoiceProcessor extends BackgroundTask {
         invoice.setSubject(subject);
 
         // Try to extract message ID if available
+        String messageId = null;
         String[] messageIdHeaders = message.getHeader("Message-ID");
         if (messageIdHeaders != null && messageIdHeaders.length > 0) {
-            invoice.setEmailId(messageIdHeaders[0]);
+            messageId = messageIdHeaders[0];
+        }
+
+        // If no Message-ID, create a hash
+        if (messageId == null || messageId.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+
+            if (message.getSubject() != null) {
+                sb.append(message.getSubject());
+            }
+
+            if (message.getSentDate() != null) {
+                sb.append(message.getSentDate().getTime());
+            }
+
+            if (message.getFrom() != null && message.getFrom().length > 0) {
+                sb.append(message.getFrom()[0].toString());
+            }
+
+            messageId = "hash-" + Math.abs(sb.toString().hashCode());
+        }
+
+        try {
+            // Get the folder name
+            Folder folder = message.getFolder();
+            String folderName = folder != null ? folder.getFullName() : "unknown";
+
+            // Sanitize the message ID and folder name
+            String sanitizedId = com.intenovation.email.downloader.FileUtils.sanitizeFileName(messageId);
+            String sanitizedFolder = com.intenovation.email.downloader.FileUtils.sanitizeFolderName(folderName);
+
+            // Construct the file:// URL to the message directory
+            File emailDirectory = config.getEmailDirectory();
+            File messageDir = new File(emailDirectory, sanitizedFolder + File.separator + "messages" + File.separator + sanitizedId);
+            String fileUrl = messageDir.toURI().toString();
+
+            // Set the emailId to the file:// URL
+            invoice.setEmailId(fileUrl);
+        } catch (Exception e) {
+            // Fallback to just using the message ID if there's an error
+            LOGGER.log(Level.WARNING, "Error creating file URL: " + e.getMessage(), e);
+            invoice.setEmailId(messageId);
         }
 
         // Get sender email
