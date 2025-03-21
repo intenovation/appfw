@@ -115,7 +115,7 @@ public class AppBootstrapper {
         // Invoice menu category
         categories.add(new CategoryBuilder("Invoices")
                 .addAction("Run Invoice Analysis", invoiceAnalyzer::runInvoiceAnalysisNow)
-                .addAction("Run Enhanced Invoice Analysis", () -> invoiceAnalyzer.runEnhancedInvoiceAnalysisNow())
+                .addAction("Run Enhanced Invoice Analysis", invoiceAnalyzer::runEnhancedInvoiceAnalysisNow)
                 .addAction("Configure Invoice Settings", invoiceAnalyzer::showConfigDialog)
                 .addAction("Open Reports Directory", invoiceAnalyzer::openReportsDirectory)
                 .addAction("Generate Sample Invoice", invoiceAnalyzer::generateSampleInvoice)
@@ -141,13 +141,13 @@ public class AppBootstrapper {
         List<BackgroundTask> tasks = new ArrayList<>();
 
         // Email tasks
-        tasks.add(new EmailDownloader()); // Full sync
+        tasks.add(new EmailDownloader()); // Full sync with duplicate detection
         tasks.add(new EmailDownloader(emailConfig.getSyncIntervalMinutes())); // Incremental sync
         tasks.add(new EmailCleanup(emailConfig.getCleanupIntervalHours()));
 
         // Invoice tasks
         tasks.add(new InvoiceProcessor(invoiceConfig, uiService));
-
+        
         // Add the Enhanced Invoice Processor
         tasks.add(new EnhancedInvoiceProcessor(invoiceConfig, uiService));
 

@@ -201,8 +201,14 @@ class LocalMessage extends MimeMessage {
         try {
             return new Address[]{new InternetAddress(from)};
         } catch (Exception e) {
-            // If the address is invalid, try to create it anyway but mark it as non-strict
-            return new Address[]{new InternetAddress(from, false)};
+            try {
+                // If the address is invalid, try to create it anyway but mark it as non-strict
+                 return new Address[]{new InternetAddress(from, false)};
+            } catch (Exception e2) {
+                    LOGGER.log(Level.WARNING, "Error parsing from address: " + from, e2);
+                    LOGGER.log(Level.INFO,this.properties.toString());
+                    return null;
+                }
         }
     }
 

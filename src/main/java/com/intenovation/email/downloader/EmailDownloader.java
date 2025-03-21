@@ -9,9 +9,8 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
-import java.util.Collections;
-import java.util.Date;
-import java.util.Properties;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -26,7 +25,7 @@ public class EmailDownloader extends BackgroundTask {
      * Create a new Email Downloader task for full sync
      */
     public EmailDownloader() {
-        this(false, "Full Email Sync", "Downloads all emails from the IMAP server", 3600 * 12);
+        this(false, "Full Email Sync", "Downloads all emails from the IMAP server that aren't already downloaded", 3600 * 12);
     }
 
     /**
@@ -146,6 +145,14 @@ public class EmailDownloader extends BackgroundTask {
             baseDir.mkdirs();
         }
 
+        // Index existing message IDs to avoid duplicate downloads
+        Set<String> existingMessageIds = ConcurrentHashMap.newKeySet();
+        if (!newOnly) {
+            progressUpdater.update(5, "Indexing existing messages to avoid duplicates...");
+            indexExistingMessages(baseDir, existingMessageIds);
+            progressUpdater.update(10, "Found " + existingMessageIds.size() + " existing messages");
+        }
+
         // Create .lastSync file to track last sync time
         File lastSyncFile = new File(baseDir, ".lastSync");
         Date lastSyncDate = null;
@@ -193,11 +200,12 @@ public class EmailDownloader extends BackgroundTask {
             Folder[] folders = defaultFolder.list();
             int totalFolders = folders.length;
 
-            progressUpdater.update(5, "Found " + totalFolders + " folders");
+            progressUpdater.update(15, "Found " + totalFolders + " folders");
 
             int processedFolders = 0;
             int totalEmails = 0;
             int downloadedEmails = 0;
+            int skippedEmails = 0;
 
             // First pass to count total emails
             if (!newOnly) { // Only count for full sync
@@ -292,14 +300,17 @@ public class EmailDownloader extends BackgroundTask {
                                         Math.abs(subject.hashCode());
                             }
 
-                            // Create message directory inside the messages directory
-                            File msgDir = new File(messagesDir, FileUtils.sanitizeFileName(messageId));
-
                             // Skip if this message already exists and we're only getting new messages
-                            if (msgDir.exists()) {
+                            String sanitizedId = FileUtils.sanitizeFileName(messageId);
+                            File msgDir = new File(messagesDir, sanitizedId);
+                            
+                            // Skip if this message already exists in our index or on disk
+                            if (existingMessageIds.contains(messageId) || msgDir.exists()) {
+                                skippedEmails++;
                                 continue;
                             }
 
+                            // Message doesn't exist, download it
                             msgDir.mkdirs();
 
                             // Save message content
@@ -308,22 +319,28 @@ public class EmailDownloader extends BackgroundTask {
                             // Save message properties
                             saveMessageProperties(msgDir, message);
 
+                            // Add to the set of existing messages to avoid duplicates in same run
+                            existingMessageIds.add(messageId);
+                            
                             downloadedEmails++;
 
                             // Update progress for full sync
                             if (!newOnly && totalEmails > 0) {
-                                int emailProgress = 5 + (90 * downloadedEmails / totalEmails);
-                                progressUpdater.update(Math.min(95, emailProgress),"Downloading");
+                                int emailProgress = 20 + (75 * (downloadedEmails + skippedEmails) / totalEmails);
+                                progressUpdater.update(Math.min(95, emailProgress), "Downloaded " + 
+                                    downloadedEmails + " new emails, skipped " + skippedEmails + " existing emails");
                             } else {
                                 // For new emails, use a simpler progress calculation
-                                progressUpdater.update(5 + (90 * (i + 1) / Math.max(1, messages.length)),"Downloading");
+                                progressUpdater.update(20 + (75 * (i + 1) / Math.max(1, messages.length)),
+                                    "Downloaded " + downloadedEmails + " new emails, skipped " + skippedEmails + " existing emails");
                             }
 
                             // Update status message periodically
                             if (downloadedEmails % 10 == 0 || i == messages.length - 1) {
-                                progressUpdater.update(5 + (90 * (i + 1) / Math.max(1, messages.length)),
+                                progressUpdater.update(20 + (75 * (i + 1) / Math.max(1, messages.length)),
                                         "Downloaded " + downloadedEmails + " emails (" +
-                                                (i + 1) + "/" + messages.length + " from " + folderName + ")");
+                                                (i + 1) + "/" + messages.length + " from " + folderName + 
+                                                "), skipped " + skippedEmails + " emails");
                             }
                         } catch (Exception e) {
                             LOGGER.log(Level.WARNING, "Error processing message", e);
@@ -342,7 +359,7 @@ public class EmailDownloader extends BackgroundTask {
                 processedFolders++;
                 int folderProgress = 5 + (90 * processedFolders / totalFolders);
                 if (downloadedEmails == 0) { // Only update if no emails were downloaded
-                    progressUpdater.update(Math.min(95, folderProgress),"Downloading");
+                    progressUpdater.update(Math.min(95, folderProgress), "Skipped " + skippedEmails + " existing emails");
                 }
             }
 
@@ -362,18 +379,113 @@ public class EmailDownloader extends BackgroundTask {
             // Finalizing
             progressUpdater.update(95, "Finalizing download...");
 
+            String resultMessage;
             if (downloadedEmails == 0) {
-                return "No new emails to download.";
+                resultMessage = "No new emails to download. " + skippedEmails + " emails already exist locally.";
             } else {
-                return "Download complete. " + downloadedEmails + " emails downloaded from " +
-                        processedFolders + " folders.";
+                resultMessage = "Download complete. " + downloadedEmails + " emails downloaded from " +
+                        processedFolders + " folders. " + skippedEmails + " emails skipped.";
             }
+            
+            progressUpdater.update(100, resultMessage);
+            return resultMessage;
 
         } catch (InterruptedException e) {
             throw e;
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Error downloading emails", e);
             return "Error during email download: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Index existing message IDs to avoid re-downloading
+     *
+     * @param baseDir The base directory containing email folders
+     * @param existingIds Set to populate with existing message IDs
+     */
+    private static void indexExistingMessages(File baseDir, Set<String> existingIds) {
+        // Get all folders
+        File[] folders = baseDir.listFiles(file -> 
+                file.isDirectory() && !file.getName().startsWith("."));
+                
+        if (folders == null) {
+            return;
+        }
+
+        for (File folder : folders) {
+            // Check for messages in "messages" directory (new structure)
+            File messagesDir = new File(folder, "messages");
+            if (messagesDir.exists() && messagesDir.isDirectory()) {
+                File[] messageDirs = messagesDir.listFiles(File::isDirectory);
+                if (messageDirs != null) {
+                    for (File messageDir : messageDirs) {
+                        // Check if this is a valid message directory
+                        File propertiesFile = new File(messageDir, "message.properties");
+                        if (propertiesFile.exists()) {
+                            try {
+                                // Load properties to get message ID
+                                Properties props = new Properties();
+                                props.load(new FileInputStream(propertiesFile));
+                                
+                                // Try to get the message ID
+                                String messageId = props.getProperty("message.id");
+                                if (messageId != null && !messageId.isEmpty()) {
+                                    existingIds.add(messageId);
+                                }
+                                
+                                // Also add the folder name version
+                                String folderMessageId = props.getProperty("message.id.folder");
+                                if (folderMessageId != null && !folderMessageId.isEmpty()) {
+                                    existingIds.add(folderMessageId);
+                                }
+                                
+                                // If no message ID, use the folder name
+                                if ((messageId == null || messageId.isEmpty()) && 
+                                    (folderMessageId == null || folderMessageId.isEmpty())) {
+                                    existingIds.add(messageDir.getName());
+                                }
+                            } catch (IOException e) {
+                                LOGGER.log(Level.WARNING, "Error reading properties file: " + propertiesFile, e);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Check for messages in the old structure as well
+            File[] oldMessageDirs = folder.listFiles(file -> 
+                    file.isDirectory() && 
+                    !file.getName().equals("messages") && 
+                    !file.getName().startsWith(".") && 
+                    new File(file, "message.properties").exists());
+                    
+            if (oldMessageDirs != null) {
+                for (File messageDir : oldMessageDirs) {
+                    // Check if this is a valid message directory
+                    File propertiesFile = new File(messageDir, "message.properties");
+                    if (propertiesFile.exists()) {
+                        try {
+                            // Load properties to get message ID
+                            Properties props = new Properties();
+                            props.load(new FileInputStream(propertiesFile));
+                            
+                            // Try to get the message ID
+                            String messageId = props.getProperty("message.id");
+                            if (messageId != null && !messageId.isEmpty()) {
+                                existingIds.add(messageId);
+                            }
+                            
+                            // If no message ID, use the folder name
+                            if (messageId == null || messageId.isEmpty()) {
+                                existingIds.add(messageDir.getName());
+                            }
+                        } catch (IOException e) {
+                            LOGGER.log(Level.WARNING, "Error reading properties file: " + propertiesFile, e);
+                        }
+                    }
+                }
+            }
         }
     }
 
