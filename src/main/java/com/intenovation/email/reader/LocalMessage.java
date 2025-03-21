@@ -75,6 +75,7 @@ class LocalMessage extends MimeMessage {
                 // Get basic fields
                 this.subject = properties.getProperty("subject");
                 this.from = properties.getProperty("from");
+                this.replyTo = properties.getProperty("reply.to"); // Add this line
 
                 String toStr = properties.getProperty("to");
                 if (toStr != null) {
@@ -203,12 +204,35 @@ class LocalMessage extends MimeMessage {
         } catch (Exception e) {
             try {
                 // If the address is invalid, try to create it anyway but mark it as non-strict
-                 return new Address[]{new InternetAddress(from, false)};
+                return new Address[]{new InternetAddress(from, false)};
             } catch (Exception e2) {
-                    LOGGER.log(Level.WARNING, "Error parsing from address: " + from, e2);
-                    LOGGER.log(Level.INFO,this.properties.toString());
-                    return null;
+                LOGGER.log(Level.WARNING, "Error parsing from address: " + from, e2);
+                LOGGER.log(Level.INFO, this.properties.toString());
+
+                // Create a custom address as last resort
+                String cleanedAddress = from.replaceAll("[\\s:;,<>]", "");
+                int atIndex = cleanedAddress.indexOf('@');
+                if (atIndex > 0) {
+                    try {
+                        return new Address[]{new InternetAddress(cleanedAddress)};
+                    } catch (Exception e3) {
+                        // If still fails, create a dummy address
+                        try {
+                            return new Address[]{new InternetAddress("unknown@domain.com")};
+                        } catch (Exception e4) {
+                            // This should never happen
+                            return null;
+                        }
+                    }
+                } else {
+                    try {
+                        return new Address[]{new InternetAddress("unknown@domain.com")};
+                    } catch (Exception e4) {
+                        // This should never happen
+                        return null;
+                    }
                 }
+            }
         }
     }
 
@@ -249,5 +273,38 @@ class LocalMessage extends MimeMessage {
     public InputStream getInputStream() throws IOException, MessagingException {
         loadContent();
         return content != null ? new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)) : null;
+    }
+    private String replyTo;
+
+    @Override
+    public Address[] getReplyTo() throws MessagingException {
+        if (replyTo == null) {
+            return super.getReplyTo(); // Fall back to default implementation
+        }
+
+        try {
+            // Try to parse as a comma-separated list of addresses
+            String[] replyToAddresses = replyTo.split(",\\s*");
+            Address[] addresses = new Address[replyToAddresses.length];
+
+            for (int i = 0; i < replyToAddresses.length; i++) {
+                try {
+                    addresses[i] = new InternetAddress(replyToAddresses[i]);
+                } catch (Exception e) {
+                    // Try non-strict parsing
+                    try {
+                        addresses[i] = new InternetAddress(replyToAddresses[i], false);
+                    } catch (Exception e2) {
+                        // If all else fails, create a dummy address
+                        LOGGER.log(Level.WARNING, "Error parsing reply-to address: " + replyToAddresses[i], e2);
+                        addresses[i] = new InternetAddress("unknown@domain.com");
+                    }
+                }
+            }
+            return addresses;
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Error processing reply-to addresses", e);
+            return null;
+        }
     }
 }

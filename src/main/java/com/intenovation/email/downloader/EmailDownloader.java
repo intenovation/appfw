@@ -661,6 +661,19 @@ public class EmailDownloader extends BackgroundTask {
             props.setProperty("from", from.toString());
         }
 
+        // Reply-To (Add this new section)
+        Address[] replyToAddresses = message.getReplyTo();
+        if (replyToAddresses != null && replyToAddresses.length > 0) {
+            StringBuilder replyTo = new StringBuilder();
+            for (Address address : replyToAddresses) {
+                if (replyTo.length() > 0) {
+                    replyTo.append(", ");
+                }
+                replyTo.append(address.toString());
+            }
+            props.setProperty("reply.to", replyTo.toString());
+        }
+
         // To
         Address[] toAddresses = message.getRecipients(Message.RecipientType.TO);
         if (toAddresses != null) {
