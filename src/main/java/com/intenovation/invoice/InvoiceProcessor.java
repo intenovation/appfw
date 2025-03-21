@@ -460,7 +460,7 @@ public class InvoiceProcessor extends BackgroundTask {
             // American format: Remove all commas
             amountStr = amountStr.replace(",", "");
         }
-
+        if (".".equals(amountStr)) return 0.0;
         // Parse the formatted string
         return Double.parseDouble(amountStr);
     }

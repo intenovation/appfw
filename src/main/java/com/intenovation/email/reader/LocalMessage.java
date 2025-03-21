@@ -202,7 +202,7 @@ class LocalMessage extends MimeMessage {
             return new Address[]{new InternetAddress(from)};
         } catch (Exception e) {
             // If the address is invalid, try to create it anyway but mark it as non-strict
-            return new Address[]{new InternetAddress(from, true)};
+            return new Address[]{new InternetAddress(from, false)};
         }
     }
 
