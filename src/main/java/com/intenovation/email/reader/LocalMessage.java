@@ -218,7 +218,10 @@ class LocalMessage extends MimeMessage {
                     } catch (Exception e3) {
                         // If still fails, create a dummy address
                         try {
-                            return new Address[]{new InternetAddress("unknown@domain.com")};
+                            if (from.contains("Emadco"))
+                                return new Address[]{new InternetAddress("Statement@emadcodisposal.com")};
+                            else
+                                return new Address[]{new InternetAddress("unknown@domain.com")};
                         } catch (Exception e4) {
                             // This should never happen
                             return null;
