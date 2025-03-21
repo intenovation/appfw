@@ -41,7 +41,7 @@ public class Aufbewahrung {
         System.out.println(Invoice.header());
         Statistic stat = new Statistic("Total");
         try {
-            store = LocalMail.openStore(new File("/Users/jens/src/tex/intenovation/Aufbewahrung/EmailArchive"));
+            store = LocalMail.openStore(new File("EmailArchive/appfw"));
             Folder[] f = store.getDefaultFolder().list("*");
             for (Folder fd : f) {
                 //System.out.println(">> " + fd.getName());
@@ -145,7 +145,7 @@ public class Aufbewahrung {
                 if (true || !folderName.startsWith("20") || folderName.contains("@")) {
 
 
-                    folderName = "emails/"+year + "/" + domain + "/"+ from;
+                    folderName = "InvoiceReport/Aufbewahrung/"+year + "/" + domain + "/"+ from;
 /*
                     if (false) {
                         Folder newFolder = store.getFolder("INBOX/" + folderName.replace('/', '-'));

@@ -27,6 +27,8 @@ public class InvoiceReportGenerator {
      * @throws IOException If there is an error writing the reports
      */
     public String generateReports(List<Invoice> invoices, File outputDirectory) throws IOException {
+        outputDirectory = new File(outputDirectory, "EnhancedInvoiceProcessor");
+        outputDirectory.mkdirs();
         // Create a timestamp for the report files
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd_HHmmss");
         String timestamp = sdf.format(new Date());

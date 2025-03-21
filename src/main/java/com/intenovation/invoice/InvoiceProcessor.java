@@ -527,9 +527,10 @@ public class InvoiceProcessor extends BackgroundTask {
                 writer.write(invoice.toString());
             }
         }
-
+       File outputDirectory = new File(config.getOutputDirectory(), "InvoiceProcessor");
+        outputDirectory.mkdirs();
         // Summary report with statistics
-        File summaryFile = new File(config.getOutputDirectory(), "summary_" + timestamp + ".txt");
+        File summaryFile = new File(outputDirectory, "summary_" + timestamp + ".txt");
 
         try (FileWriter writer = new FileWriter(summaryFile)) {
             writer.write("Invoice Analysis Summary\n");
