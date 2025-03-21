@@ -33,7 +33,16 @@ public class InvoiceConfiguration implements ConfigurationDefinition {
     public InvoiceConfiguration() {
         loadConfiguration();
     }
-
+    /**
+     * Check if the configuration is complete and valid
+     * @return true if configuration is complete and directories exist
+     */
+    public boolean isConfigurationComplete() {
+        return emailDirectory != null && emailDirectory.exists() &&
+                outputDirectory != null && outputDirectory.exists() &&
+                !emailDirectory.getAbsolutePath().isEmpty() &&
+                !outputDirectory.getAbsolutePath().isEmpty();
+    }
     @Override
     public List<ConfigItem> getConfigItems() {
         List<ConfigItem> items = new ArrayList<>();

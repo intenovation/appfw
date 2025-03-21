@@ -46,6 +46,26 @@ public class InvoiceAnalyzerApp {
      */
     public void setSystemTrayApp(SystemTrayApp systemTrayApp) {
         this.systemTrayApp = systemTrayApp;
+
+        // Initialize UI state based on configuration completeness
+        initializeUIState();
+    }
+
+    /**
+     * Initialize the UI state based on configuration
+     * Shows config dialog if configuration is incomplete,
+     * otherwise shows status dialog
+     */
+    public void initializeUIState() {
+        if (!config.isConfigurationComplete()) {
+            // Configuration is incomplete, show config dialog
+            LOGGER.info("Configuration incomplete, showing config dialog");
+            showConfigDialog();
+        } else {
+            // Configuration is complete, show status dialog
+            LOGGER.info("Configuration complete, showing status dialog");
+            showStatusDialog();
+        }
     }
 
     /**
@@ -74,7 +94,7 @@ public class InvoiceAnalyzerApp {
     /**
      * Show the status dialog
      */
-    private void showStatusDialog() {
+    public void showStatusDialog() {
         if (systemTrayApp != null) {
             systemTrayApp.showTaskStatus();
         } else {
