@@ -20,7 +20,7 @@ import java.util.logging.Logger;
 public class InvoiceAnalyzerApp {
     private static final Logger LOGGER = Logger.getLogger(InvoiceAnalyzerApp.class.getName());
     private static final String APP_NAME = "Invoice Analyzer";
-    private static final String VERSION = "1.0.0";
+    private static final String VERSION = "1.1.0";
 
     // Dependencies
     private final InvoiceConfiguration config;
@@ -72,73 +72,6 @@ public class InvoiceAnalyzerApp {
     }
 
     /**
-     * Create application configuration
-     * @deprecated Use the AppBootstrapper's createAppConfig method instead
-     */
-    @Deprecated
-    private AppConfig createAppConfig() {
-        return new AppConfig() {
-            @Override
-            public String getAppName() {
-                return APP_NAME;
-            }
-
-            @Override
-            public String getIconPath() {
-                return "/intenovation.png";  // Make sure this exists in your resources
-            }
-
-            @Override
-            public void onIconDoubleClick() {
-                showStatusDialog();
-            }
-        };
-    }
-
-    /**
-     * Create menu categories
-     * @deprecated Use the AppBootstrapper's createCombinedMenu method instead
-     */
-    @Deprecated
-    private List<MenuCategory> createMenuCategories() {
-        List<MenuCategory> categories = new ArrayList<>();
-
-        // Settings category
-        CategoryBuilder settingsBuilder = new CategoryBuilder("Settings");
-        settingsBuilder.addAction("Configure Directories", this::showConfigDialog);
-        settingsBuilder.addAction("Open Email Directory", () -> openEmailDirectory());
-        settingsBuilder.addAction("Open Reports Directory", () -> openReportsDirectory());
-        categories.add(settingsBuilder.build());
-
-        // Actions category
-        CategoryBuilder actionsBuilder = new CategoryBuilder("Actions");
-        actionsBuilder.addAction("Run Invoice Analysis Now", () -> runInvoiceAnalysisNow());
-        actionsBuilder.addAction("Generate Sample Invoice", this::generateSampleInvoice);
-        categories.add(actionsBuilder.build());
-
-        // Help category
-        CategoryBuilder helpBuilder = new CategoryBuilder("Help");
-        helpBuilder.addAction("About", this::showAboutDialog);
-        categories.add(helpBuilder.build());
-
-        return categories;
-    }
-
-    /**
-     * Create tasks
-     * @deprecated Use the AppBootstrapper's createCombinedTasks method instead
-     */
-    @Deprecated
-    private List<BackgroundTask> createTasks() {
-        List<BackgroundTask> tasks = new ArrayList<>();
-
-        // Create the invoice processor that extends BackgroundTask
-        tasks.add(new InvoiceProcessor(config, uiService));
-
-        return tasks;
-    }
-
-    /**
      * Show the status dialog
      */
     private void showStatusDialog() {
@@ -150,13 +83,24 @@ public class InvoiceAnalyzerApp {
     }
 
     /**
-     * Run invoice analysis
+     * Run regular invoice analysis
      */
     public void runInvoiceAnalysisNow() {
         if (systemTrayApp != null) {
             systemTrayApp.startTask("Invoice Processor");
         } else {
             LOGGER.warning("Cannot run invoice analysis: systemTrayApp is not set");
+        }
+    }
+
+    /**
+     * Run enhanced invoice analysis
+     */
+    public void runEnhancedInvoiceAnalysisNow() {
+        if (systemTrayApp != null) {
+            systemTrayApp.startTask("Enhanced Invoice Processor");
+        } else {
+            LOGGER.warning("Cannot run enhanced invoice analysis: systemTrayApp is not set");
         }
     }
 

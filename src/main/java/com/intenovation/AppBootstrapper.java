@@ -10,6 +10,7 @@ import com.intenovation.email.downloader.ImapDownloader;
 import com.intenovation.invoice.InvoiceAnalyzerApp;
 import com.intenovation.invoice.InvoiceConfiguration;
 import com.intenovation.invoice.InvoiceProcessor;
+import com.intenovation.invoice.EnhancedInvoiceProcessor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -114,6 +115,7 @@ public class AppBootstrapper {
         // Invoice menu category
         categories.add(new CategoryBuilder("Invoices")
                 .addAction("Run Invoice Analysis", invoiceAnalyzer::runInvoiceAnalysisNow)
+                .addAction("Run Enhanced Invoice Analysis", () -> invoiceAnalyzer.runEnhancedInvoiceAnalysisNow())
                 .addAction("Configure Invoice Settings", invoiceAnalyzer::showConfigDialog)
                 .addAction("Open Reports Directory", invoiceAnalyzer::openReportsDirectory)
                 .addAction("Generate Sample Invoice", invoiceAnalyzer::generateSampleInvoice)
@@ -145,6 +147,9 @@ public class AppBootstrapper {
 
         // Invoice tasks
         tasks.add(new InvoiceProcessor(invoiceConfig, uiService));
+
+        // Add the Enhanced Invoice Processor
+        tasks.add(new EnhancedInvoiceProcessor(invoiceConfig, uiService));
 
         return tasks;
     }
