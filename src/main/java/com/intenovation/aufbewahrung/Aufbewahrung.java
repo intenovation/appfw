@@ -1,5 +1,6 @@
 package com.intenovation.aufbewahrung;
 
+import com.intenovation.email.reader.LocalMail;
 import com.sun.mail.util.BASE64DecoderStream;
 import org.apache.pdfbox.pdfparser.PDFParser;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -40,13 +41,7 @@ public class Aufbewahrung {
         System.out.println(Invoice.header());
         Statistic stat = new Statistic("Total");
         try {
-            Properties props = System.getProperties();
-            props.setProperty("mail.store.protocol", "imaps");
-            Session session = Session.getDefaultInstance(props, null);
-            // session.setDebug(true);
-            store = session.getStore("imaps");
-            store.connect("imap.gmail.com", "secred@example", "not your business");
-
+            store = LocalMail.openStore(new File("/Users/jens/src/tex/intenovation/Aufbewahrung/EmailArchive"));
             Folder[] f = store.getDefaultFolder().list("*");
             for (Folder fd : f) {
                 //System.out.println(">> " + fd.getName());
