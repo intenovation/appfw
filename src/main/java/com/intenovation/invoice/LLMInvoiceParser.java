@@ -6,6 +6,7 @@ import io.github.ollama4j.utils.OptionsBuilder;
 import org.json.JSONObject;
 import org.json.JSONException;
 
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -16,7 +17,7 @@ import java.util.logging.Logger;
 public class LLMInvoiceParser {
     private static final Logger LOGGER = Logger.getLogger(LLMInvoiceParser.class.getName());
     private static final int MAX_RETRIES = 3;
-    private static final long RETRY_DELAY_MS = 1000; // 1 second
+    private static final long RETRY_DELAY_MS = 2000; // 2 seconds between retries
 
     private final InvoiceConfiguration config;
     private final OllamaAPI ollamaAPI;
@@ -27,7 +28,15 @@ public class LLMInvoiceParser {
      */
     public LLMInvoiceParser(InvoiceConfiguration config) {
         this.config = config;
+
+        // Create Ollama API client with increased timeout
         this.ollamaAPI = new OllamaAPI(config.getOllamaHost());
+
+        // Set request timeout
+        int timeoutSeconds = config.getOllamaTimeoutSeconds();
+        LOGGER.info("Setting Ollama timeout to " + timeoutSeconds + " seconds");
+
+        this.ollamaAPI.setRequestTimeoutSeconds(timeoutSeconds);
     }
 
     /**
@@ -45,11 +54,21 @@ public class LLMInvoiceParser {
                     return null;
                 }
 
-                // Create prompt for Ollama
-                String prompt = createPrompt(content);
+                // Log attempt information
+                LOGGER.log(Level.INFO, "Calling Ollama with model: " + config.getOllamaModel() +
+                        " (attempt " + attempt + " of " + MAX_RETRIES + ")");
 
-                // Call Ollama API
-                LOGGER.log(Level.INFO, "Calling Ollama with model: " + config.getOllamaModel());
+                // Create a shorter prompt if content is very large
+                String prompt;
+                if (content.length() > 10000) {
+                    LOGGER.log(Level.INFO, "Content is very large (" + content.length() +
+                            " chars), truncating to 10000 chars");
+                    prompt = createPrompt(content.substring(0, 10000));
+                } else {
+                    prompt = createPrompt(content);
+                }
+
+                // Call Ollama API with increased timeout and lower temperature
                 OllamaResult result = ollamaAPI.generate(
                         config.getOllamaModel(),
                         prompt,
@@ -61,12 +80,14 @@ public class LLMInvoiceParser {
                 );
 
                 if (result != null && result.getResponse() != null && !result.getResponse().isEmpty()) {
+                    LOGGER.log(Level.INFO, "Ollama response received, parsing JSON");
                     return parseJsonResponse(result.getResponse(), baseInvoice);
                 }
 
                 LOGGER.log(Level.WARNING, "Empty Ollama response on attempt " + attempt);
 
                 if (attempt < MAX_RETRIES) {
+                    LOGGER.log(Level.INFO, "Waiting " + RETRY_DELAY_MS + "ms before retry");
                     TimeUnit.MILLISECONDS.sleep(RETRY_DELAY_MS);
                 }
             } catch (InterruptedException e) {
@@ -78,6 +99,7 @@ public class LLMInvoiceParser {
 
                 if (attempt < MAX_RETRIES) {
                     try {
+                        LOGGER.log(Level.INFO, "Waiting " + RETRY_DELAY_MS + "ms before retry");
                         TimeUnit.MILLISECONDS.sleep(RETRY_DELAY_MS);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();

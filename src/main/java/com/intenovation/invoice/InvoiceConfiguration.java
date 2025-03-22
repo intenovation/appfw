@@ -32,6 +32,7 @@ public class InvoiceConfiguration implements ConfigurationDefinition {
     private String ollamaHost = "http://localhost:11434";
     private String ollamaModel = "llama3.2";
     private int ollamaMaxTokens = 4096;
+    private int ollamaTimeoutSeconds = 300; // 5 minutes timeout
 
     /**
      * Create a new InvoiceConfiguration
@@ -74,11 +75,12 @@ public class InvoiceConfiguration implements ConfigurationDefinition {
 
         items.add(new DropdownConfigItem("processingInterval", "Process invoices every", interval, intervals));
 
-        // Add a section for Ollama settings
+        // Ollama settings
         items.add(new CheckboxConfigItem("useOllamaFallback", "Use Ollama when rule-based parsing fails", useOllamaFallback));
         items.add(new TextConfigItem("ollamaHost", "Ollama Host URL", ollamaHost));
         items.add(new TextConfigItem("ollamaModel", "Ollama Model Name", ollamaModel));
         items.add(new NumberConfigItem("ollamaMaxTokens", "Max Response Tokens", ollamaMaxTokens));
+        items.add(new NumberConfigItem("ollamaTimeoutSeconds", "API Timeout (seconds)", ollamaTimeoutSeconds));
 
         return items;
     }
@@ -124,6 +126,10 @@ public class InvoiceConfiguration implements ConfigurationDefinition {
             this.ollamaMaxTokens = ((Number) configValues.get("ollamaMaxTokens")).intValue();
         }
 
+        if (configValues.get("ollamaTimeoutSeconds") instanceof Number) {
+            this.ollamaTimeoutSeconds = ((Number) configValues.get("ollamaTimeoutSeconds")).intValue();
+        }
+
         // Save to file
         saveConfiguration();
 
@@ -150,6 +156,7 @@ public class InvoiceConfiguration implements ConfigurationDefinition {
         values.put("ollamaHost", ollamaHost);
         values.put("ollamaModel", ollamaModel);
         values.put("ollamaMaxTokens", ollamaMaxTokens);
+        values.put("ollamaTimeoutSeconds", ollamaTimeoutSeconds);
 
         return values;
     }
@@ -212,6 +219,15 @@ public class InvoiceConfiguration implements ConfigurationDefinition {
                         LOGGER.log(Level.WARNING, "Invalid Ollama max tokens in config: " + ollamaMaxTokensStr, e);
                     }
                 }
+
+                String ollamaTimeoutSecondsStr = props.getProperty("ollama.timeout.seconds");
+                if (ollamaTimeoutSecondsStr != null && !ollamaTimeoutSecondsStr.isEmpty()) {
+                    try {
+                        ollamaTimeoutSeconds = Integer.parseInt(ollamaTimeoutSecondsStr);
+                    } catch (NumberFormatException e) {
+                        LOGGER.log(Level.WARNING, "Invalid Ollama timeout in config: " + ollamaTimeoutSecondsStr, e);
+                    }
+                }
             } catch (IOException e) {
                 LOGGER.log(Level.WARNING, "Error loading configuration", e);
             }
@@ -232,6 +248,7 @@ public class InvoiceConfiguration implements ConfigurationDefinition {
         props.setProperty("ollama.host", ollamaHost);
         props.setProperty("ollama.model", ollamaModel);
         props.setProperty("ollama.max.tokens", String.valueOf(ollamaMaxTokens));
+        props.setProperty("ollama.timeout.seconds", String.valueOf(ollamaTimeoutSeconds));
 
         try (FileOutputStream fos = new FileOutputStream(CONFIG_FILE)) {
             props.store(fos, "Invoice Analyzer Configuration");
@@ -275,4 +292,5 @@ public class InvoiceConfiguration implements ConfigurationDefinition {
     public String getOllamaHost() { return ollamaHost; }
     public String getOllamaModel() { return ollamaModel; }
     public int getOllamaMaxTokens() { return ollamaMaxTokens; }
+    public int getOllamaTimeoutSeconds() { return ollamaTimeoutSeconds; }
 }
