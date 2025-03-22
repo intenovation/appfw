@@ -8,6 +8,7 @@ import com.intenovation.email.downloader.EmailCleanup;
 import com.intenovation.email.downloader.EmailDownloader;
 import com.intenovation.email.downloader.EmailDownloaderYearFilter;
 import com.intenovation.email.downloader.ImapDownloader;
+import com.intenovation.email.ui.EmailBrowserIntegration;
 import com.intenovation.invoice.InvoiceAnalyzerApp;
 import com.intenovation.invoice.InvoiceConfiguration;
 import com.intenovation.invoice.InvoiceProcessor;
@@ -44,11 +45,16 @@ public class AppBootstrapper {
             ImapDownloader emailDownloader = new ImapDownloader(emailConfig, uiService);
             InvoiceAnalyzerApp invoiceAnalyzer = new InvoiceAnalyzerApp(invoiceConfig, uiService);
 
+            // Create the email browser integration
+            EmailBrowserIntegration emailBrowser = new EmailBrowserIntegration(
+                    emailConfig.getEmailDirectory(), uiService);
+
             // Create a single AppConfig
-            AppConfig appConfig = createAppConfig(emailDownloader, invoiceAnalyzer);
+            AppConfig appConfig = createAppConfig(emailDownloader, invoiceAnalyzer, emailBrowser);
 
             // Create a combined menu
-            List<MenuCategory> menuCategories = createCombinedMenu(emailDownloader, invoiceAnalyzer);
+            List<MenuCategory> menuCategories = createCombinedMenu(
+                    emailDownloader, invoiceAnalyzer, emailBrowser);
 
             // Create all background tasks
             List<BackgroundTask> tasks = createCombinedTasks(emailConfig, invoiceConfig, uiService);
@@ -59,6 +65,7 @@ public class AppBootstrapper {
             // Register the system tray app with components so they can access it
             emailDownloader.setSystemTrayApp(systemTrayApp);
             invoiceAnalyzer.setSystemTrayApp(systemTrayApp);
+            emailBrowser.setSystemTrayApp(systemTrayApp);
 
             // Set the instance in the ImapDownloader's singleton holder
             // This is needed for backward compatibility with existing code
@@ -74,7 +81,9 @@ public class AppBootstrapper {
     /**
      * Create a single AppConfig for the combined application
      */
-    private static AppConfig createAppConfig(ImapDownloader emailDownloader, InvoiceAnalyzerApp invoiceAnalyzer) {
+    private static AppConfig createAppConfig(ImapDownloader emailDownloader,
+                                             InvoiceAnalyzerApp invoiceAnalyzer,
+                                             EmailBrowserIntegration emailBrowser) {
         return new AppConfig() {
             @Override
             public String getAppName() {
@@ -101,9 +110,11 @@ public class AppBootstrapper {
     }
 
     /**
-     * Create a combined menu from both applications
+     * Create a combined menu from all applications
      */
-    private static List<MenuCategory> createCombinedMenu(ImapDownloader emailDownloader, InvoiceAnalyzerApp invoiceAnalyzer) {
+    private static List<MenuCategory> createCombinedMenu(ImapDownloader emailDownloader,
+                                                         InvoiceAnalyzerApp invoiceAnalyzer,
+                                                         EmailBrowserIntegration emailBrowser) {
         List<MenuCategory> categories = new ArrayList<>();
 
         // Email menu category with new year-based options
@@ -119,6 +130,9 @@ public class AppBootstrapper {
                 .addAction("Open Email Archive", emailDownloader::openEmailArchive)
                 .build());
 
+        // Add Email Browser menu category
+        categories.add(emailBrowser.createMenuCategory());
+
         // Invoice menu category
         categories.add(new CategoryBuilder("Invoices")
                 .addAction("Run Invoice Analysis", invoiceAnalyzer::runInvoiceAnalysisNow)
@@ -132,6 +146,7 @@ public class AppBootstrapper {
         categories.add(new CategoryBuilder("About")
                 .addAction("About Email Downloader", emailDownloader::showAboutDialog)
                 .addAction("About Invoice Analyzer", invoiceAnalyzer::showAboutDialog)
+                .addAction("About Email Browser", emailBrowser.getEmailBrowserApp()::showAboutDialog)
                 .build());
 
         return categories;

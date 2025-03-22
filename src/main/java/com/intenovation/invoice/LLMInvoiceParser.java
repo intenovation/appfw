@@ -98,7 +98,8 @@ public class LLMInvoiceParser {
                 "Only include fields in the response if you have high confidence. If a field cannot be determined, leave it as the default value shown above.\n" +
                 "Return ONLY the JSON with no explanations or other text.\n\n" +
                 "Here is the content to analyze:\n\n" +
-                content;
+                content+
+                ":\n\n this is the end of the content. Now here respond with the JSON:\n\n" ;
     }
 
     /**
