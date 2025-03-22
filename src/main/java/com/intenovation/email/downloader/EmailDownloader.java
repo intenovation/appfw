@@ -406,9 +406,9 @@ public class EmailDownloader extends BackgroundTask {
      */
     private static void indexExistingMessages(File baseDir, Set<String> existingIds) {
         // Get all folders
-        File[] folders = baseDir.listFiles(file -> 
+        File[] folders = baseDir.listFiles(file ->
                 file.isDirectory() && !file.getName().startsWith("."));
-                
+
         if (folders == null) {
             return;
         }
@@ -423,26 +423,26 @@ public class EmailDownloader extends BackgroundTask {
                         // Check if this is a valid message directory
                         File propertiesFile = new File(messageDir, "message.properties");
                         if (propertiesFile.exists()) {
-                            try {
+                            try (FileInputStream fis = new FileInputStream(propertiesFile)) {
                                 // Load properties to get message ID
                                 Properties props = new Properties();
-                                props.load(new FileInputStream(propertiesFile));
-                                
+                                props.load(fis);
+
                                 // Try to get the message ID
                                 String messageId = props.getProperty("message.id");
                                 if (messageId != null && !messageId.isEmpty()) {
                                     existingIds.add(messageId);
                                 }
-                                
+
                                 // Also add the folder name version
                                 String folderMessageId = props.getProperty("message.id.folder");
                                 if (folderMessageId != null && !folderMessageId.isEmpty()) {
                                     existingIds.add(folderMessageId);
                                 }
-                                
+
                                 // If no message ID, use the folder name
-                                if ((messageId == null || messageId.isEmpty()) && 
-                                    (folderMessageId == null || folderMessageId.isEmpty())) {
+                                if ((messageId == null || messageId.isEmpty()) &&
+                                        (folderMessageId == null || folderMessageId.isEmpty())) {
                                     existingIds.add(messageDir.getName());
                                 }
                             } catch (IOException e) {
@@ -452,30 +452,30 @@ public class EmailDownloader extends BackgroundTask {
                     }
                 }
             }
-            
+
             // Check for messages in the old structure as well
-            File[] oldMessageDirs = folder.listFiles(file -> 
-                    file.isDirectory() && 
-                    !file.getName().equals("messages") && 
-                    !file.getName().startsWith(".") && 
-                    new File(file, "message.properties").exists());
-                    
+            File[] oldMessageDirs = folder.listFiles(file ->
+                    file.isDirectory() &&
+                            !file.getName().equals("messages") &&
+                            !file.getName().startsWith(".") &&
+                            new File(file, "message.properties").exists());
+
             if (oldMessageDirs != null) {
                 for (File messageDir : oldMessageDirs) {
                     // Check if this is a valid message directory
                     File propertiesFile = new File(messageDir, "message.properties");
                     if (propertiesFile.exists()) {
-                        try {
+                        try (FileInputStream fis = new FileInputStream(propertiesFile)) {
                             // Load properties to get message ID
                             Properties props = new Properties();
-                            props.load(new FileInputStream(propertiesFile));
-                            
+                            props.load(fis);
+
                             // Try to get the message ID
                             String messageId = props.getProperty("message.id");
                             if (messageId != null && !messageId.isEmpty()) {
                                 existingIds.add(messageId);
                             }
-                            
+
                             // If no message ID, use the folder name
                             if (messageId == null || messageId.isEmpty()) {
                                 existingIds.add(messageDir.getName());
