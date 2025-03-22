@@ -68,6 +68,9 @@ public class LLMInvoiceParser {
                     prompt = createPrompt(content);
                 }
 
+                // Log the full prompt being sent to Ollama
+                LOGGER.log(Level.INFO, "OLLAMA PROMPT: " + prompt);
+
                 // Call Ollama API with increased timeout and lower temperature
                 OllamaResult result = ollamaAPI.generate(
                         config.getOllamaModel(),
@@ -80,6 +83,8 @@ public class LLMInvoiceParser {
                 );
 
                 if (result != null && result.getResponse() != null && !result.getResponse().isEmpty()) {
+                    // Log the full response from Ollama
+                    LOGGER.log(Level.INFO, "OLLAMA RESPONSE: " + result.getResponse());
                     LOGGER.log(Level.INFO, "Ollama response received, parsing JSON");
                     return parseJsonResponse(result.getResponse(), baseInvoice);
                 }
