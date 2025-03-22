@@ -1,42 +1,30 @@
 package com.intenovation.invoice;
 
-import io.github.ollama4j.OllamaAPI;
-import io.github.ollama4j.models.response.OllamaResult;
-import io.github.ollama4j.utils.OptionsBuilder;
 import org.json.JSONObject;
 import org.json.JSONException;
 
-import java.time.Duration;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Uses Ollama to extract invoice information from text content.
+ * Uses Ollama to extract invoice information from text content,
+ * with file-system caching to avoid redundant API calls.
  */
 public class LLMInvoiceParser {
     private static final Logger LOGGER = Logger.getLogger(LLMInvoiceParser.class.getName());
-    private static final int MAX_RETRIES = 3;
-    private static final long RETRY_DELAY_MS = 2000; // 2 seconds between retries
 
     private final InvoiceConfiguration config;
-    private final OllamaAPI ollamaAPI;
+    private final LLMCache llmCache;
 
     /**
-     * Create a new LLM invoice parser with Ollama
+     * Create a new LLM invoice parser with caching
      * @param config The invoice configuration
      */
     public LLMInvoiceParser(InvoiceConfiguration config) {
         this.config = config;
+        this.llmCache = new LLMCache(config);
 
-        // Create Ollama API client with increased timeout
-        this.ollamaAPI = new OllamaAPI(config.getOllamaHost());
-
-        // Set request timeout
-        int timeoutSeconds = config.getOllamaTimeoutSeconds();
-        LOGGER.info("Setting Ollama timeout to " + timeoutSeconds + " seconds");
-
-        this.ollamaAPI.setRequestTimeoutSeconds(timeoutSeconds);
+        LOGGER.info("Initialized LLMInvoiceParser with model: " + config.getOllamaModel());
     }
 
     /**
@@ -46,76 +34,35 @@ public class LLMInvoiceParser {
      * @return An invoice with extracted information or null if parsing failed
      */
     public Invoice parseWithLLM(String content, Invoice baseInvoice) {
-        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-            try {
-                // Check if Ollama server is available
-                if (!ollamaAPI.ping()) {
-                    LOGGER.log(Level.WARNING, "Ollama server is not available");
-                    return null;
-                }
-
-                // Log attempt information
-                LOGGER.log(Level.INFO, "Calling Ollama with model: " + config.getOllamaModel() +
-                        " (attempt " + attempt + " of " + MAX_RETRIES + ")");
-
-                // Create a shorter prompt if content is very large
-                String prompt;
-                if (content.length() > 10000) {
-                    LOGGER.log(Level.INFO, "Content is very large (" + content.length() +
-                            " chars), truncating to 10000 chars");
-                    prompt = createPrompt(content.substring(0, 10000));
-                } else {
-                    prompt = createPrompt(content);
-                }
-
-                // Log the full prompt being sent to Ollama
-                LOGGER.log(Level.INFO, "OLLAMA PROMPT: " + prompt);
-
-                // Call Ollama API with increased timeout and lower temperature
-                OllamaResult result = ollamaAPI.generate(
-                        config.getOllamaModel(),
-                        prompt,
-                        false,
-                        new OptionsBuilder()
-                                .setTemperature(0.1f)  // Low temperature for more deterministic outputs
-                                .setNumPredict(config.getOllamaMaxTokens())
-                                .build()
-                );
-
-                if (result != null && result.getResponse() != null && !result.getResponse().isEmpty()) {
-                    // Log the full response from Ollama
-                    LOGGER.log(Level.INFO, "OLLAMA RESPONSE: " + result.getResponse());
-                    LOGGER.log(Level.INFO, "Ollama response received, parsing JSON");
-                    return parseJsonResponse(result.getResponse(), baseInvoice);
-                }
-
-                LOGGER.log(Level.WARNING, "Empty Ollama response on attempt " + attempt);
-
-                if (attempt < MAX_RETRIES) {
-                    LOGGER.log(Level.INFO, "Waiting " + RETRY_DELAY_MS + "ms before retry");
-                    TimeUnit.MILLISECONDS.sleep(RETRY_DELAY_MS);
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                LOGGER.log(Level.WARNING, "Ollama parsing interrupted", e);
-                return null;
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, "Error in Ollama parsing on attempt " + attempt + ": " + e.getMessage(), e);
-
-                if (attempt < MAX_RETRIES) {
-                    try {
-                        LOGGER.log(Level.INFO, "Waiting " + RETRY_DELAY_MS + "ms before retry");
-                        TimeUnit.MILLISECONDS.sleep(RETRY_DELAY_MS);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        return null;
-                    }
-                }
+        try {
+            // Create a shorter prompt if content is very large
+            String promptContent;
+            if (content.length() > 10000) {
+                LOGGER.info("Content is very large (" + content.length() +
+                        " chars), truncating to 10000 chars");
+                promptContent = content.substring(0, 10000);
+            } else {
+                promptContent = content;
             }
-        }
 
-        LOGGER.log(Level.WARNING, "All Ollama parsing attempts failed");
-        return null;
+            // Create the prompt
+            String prompt = createPrompt(promptContent);
+
+            // Get response from cache or Ollama
+            String jsonResponse = llmCache.getResponse(prompt);
+
+            if (jsonResponse != null && !jsonResponse.isEmpty()) {
+                LOGGER.info("Got response (length: " + jsonResponse.length() + " chars), parsing JSON");
+                return parseJsonResponse(jsonResponse, baseInvoice);
+            }
+
+            LOGGER.warning("Empty or null response from LLM");
+            return null;
+
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Error in LLM parsing: " + e.getMessage(), e);
+            return null;
+        }
     }
 
     /**
@@ -170,7 +117,7 @@ public class LLMInvoiceParser {
                 jsonResponse = jsonResponse.substring(startBrace, endBrace + 1);
             }
 
-            LOGGER.log(Level.FINE, "Parsing JSON response: " + jsonResponse);
+            LOGGER.fine("Parsing JSON response: " + jsonResponse);
             JSONObject jsonObject = new JSONObject(jsonResponse);
 
             // Create a new invoice based on the base invoice
@@ -183,14 +130,14 @@ public class LLMInvoiceParser {
             invoice.setMonth(baseInvoice.getMonth());
             invoice.setDay(baseInvoice.getDay());
             invoice.setDate(baseInvoice.getDate());
-            invoice.setParse("ollama");
+            invoice.setParse("ollama+cache");
 
             // Update with Ollama-extracted information
             if (jsonObject.has("type") && !jsonObject.getString("type").isEmpty()) {
                 try {
                     invoice.setType(Type.valueOf(jsonObject.getString("type")));
                 } catch (IllegalArgumentException e) {
-                    LOGGER.log(Level.FINE, "Invalid type value: " + jsonObject.getString("type"));
+                    LOGGER.fine("Invalid type value: " + jsonObject.getString("type"));
                     invoice.setType(baseInvoice.getType());
                 }
             }
@@ -240,5 +187,30 @@ public class LLMInvoiceParser {
             LOGGER.log(Level.WARNING, "Error parsing Ollama response as JSON: " + e.getMessage() + "\nResponse: " + jsonResponse, e);
             return null;
         }
+    }
+
+    /**
+     * Get statistics about the LLM cache
+     *
+     * @return A string containing cache statistics
+     */
+    public String getCacheStats() {
+        int cacheCount = llmCache.getCacheCount();
+        long cacheSize = llmCache.getCacheSize();
+
+        return String.format("LLM Cache Statistics:\n" +
+                        "  Cached responses: %d\n" +
+                        "  Total cache size: %.2f MB",
+                cacheCount,
+                cacheSize / (1024.0 * 1024.0));
+    }
+
+    /**
+     * Clear the LLM cache
+     *
+     * @return true if the cache was successfully cleared, false otherwise
+     */
+    public boolean clearCache() {
+        return llmCache.clearCache();
     }
 }
