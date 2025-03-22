@@ -31,7 +31,7 @@ public class InvoiceConfiguration implements ConfigurationDefinition {
     private boolean useOllamaFallback = true;
     private String ollamaHost = "http://localhost:11434";
     private String ollamaModel = "llama3.2";
-    private int ollamaMaxTokens = 2000;
+    private int ollamaMaxTokens = 4096;
 
     /**
      * Create a new InvoiceConfiguration
