@@ -49,10 +49,11 @@ public class EnhancedInvoiceProcessor extends BackgroundTask {
         this.config = config;
         this.uiService = uiService;
 
-        // Initialize specialized components
-        this.parser = new InvoiceParser();
+        // Initialize specialized components with configuration
+        this.parser = new InvoiceParser(config);
         this.reportGenerator = new InvoiceReportGenerator();
-        // Create output directory if it doesn't exist
+
+        // Create output directory
         File outputDirectory = new File(config.getOutputDirectory(), "EnhancedInvoiceProcessor");
         outputDirectory.mkdirs();
         this.storage = new InvoiceStorage(outputDirectory);
