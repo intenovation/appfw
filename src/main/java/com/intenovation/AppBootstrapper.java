@@ -4,14 +4,16 @@ import com.intenovation.appfw.systemtray.*;
 import com.intenovation.appfw.ui.SwingUIService;
 import com.intenovation.appfw.ui.UIService;
 import com.intenovation.email.downloader.EmailConfiguration;
-import com.intenovation.email.downloader.EmailDownloader;
 import com.intenovation.email.downloader.EmailCleanup;
+import com.intenovation.email.downloader.EmailDownloader;
+import com.intenovation.email.downloader.EmailDownloaderYearFilter;
 import com.intenovation.email.downloader.ImapDownloader;
 import com.intenovation.invoice.InvoiceAnalyzerApp;
 import com.intenovation.invoice.InvoiceConfiguration;
 import com.intenovation.invoice.InvoiceProcessor;
 import com.intenovation.invoice.EnhancedInvoiceProcessor;
 
+import java.time.Year;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -24,6 +26,7 @@ import java.util.logging.Logger;
 public class AppBootstrapper {
     private static final Logger LOGGER = Logger.getLogger(AppBootstrapper.class.getName());
     private static final String APP_NAME = "Intenovation Suite";
+    private static SystemTrayApp systemTrayApp;
 
     /**
      * Main entry point
@@ -51,7 +54,7 @@ public class AppBootstrapper {
             List<BackgroundTask> tasks = createCombinedTasks(emailConfig, invoiceConfig, uiService);
 
             // Create a single SystemTrayApp instance
-            SystemTrayApp systemTrayApp = new SystemTrayApp(appConfig, menuCategories, tasks);
+            systemTrayApp = new SystemTrayApp(appConfig, menuCategories, tasks);
 
             // Register the system tray app with components so they can access it
             emailDownloader.setSystemTrayApp(systemTrayApp);
@@ -103,9 +106,13 @@ public class AppBootstrapper {
     private static List<MenuCategory> createCombinedMenu(ImapDownloader emailDownloader, InvoiceAnalyzerApp invoiceAnalyzer) {
         List<MenuCategory> categories = new ArrayList<>();
 
-        // Email menu category
+        // Email menu category with new year-based options
         categories.add(new CategoryBuilder("Email")
                 .addAction("Sync New Emails", emailDownloader::syncNewEmailsNow)
+                .addAction("Sync Current Year Emails", () -> startYearTask(Year.now().getValue()))
+                .addAction("Sync Last Year's Emails", () -> startYearTask(Year.now().getValue() - 1))
+                .addAction("Sync Last 5 Years", () -> startYearTask(Year.now().getValue() - 5))
+                .addAction("Sync All Emails", () -> startYearTask(0))
                 .addAction("Configure IMAP Settings", emailDownloader::showConfigDialog)
                 .addAction("Check Server Status", emailDownloader::checkServerStatus)
                 .addAction("View Storage Usage", emailDownloader::showStorageUsage)
@@ -140,17 +147,55 @@ public class AppBootstrapper {
 
         List<BackgroundTask> tasks = new ArrayList<>();
 
-        // Email tasks
-        tasks.add(new EmailDownloader()); // Full sync with duplicate detection
+        // Email tasks - added year-based email downloaders
+        tasks.add(new EmailDownloader()); // Original full sync task
         tasks.add(new EmailDownloader(emailConfig.getSyncIntervalMinutes())); // Incremental sync
+
+        // Add year-specific email downloaders
+        int currentYear = Year.now().getValue();
+        tasks.add(new EmailDownloaderYearFilter(currentYear)); // Current year only
+        tasks.add(new EmailDownloaderYearFilter(currentYear - 1)); // Last year only
+        tasks.add(new EmailDownloaderYearFilter(currentYear - 5)); // Last 5 years
+        tasks.add(new EmailDownloaderYearFilter(0)); // Full sync with year filter (same as regular)
+
+        // Cleanup task
         tasks.add(new EmailCleanup(emailConfig.getCleanupIntervalHours()));
 
         // Invoice tasks
         tasks.add(new InvoiceProcessor(invoiceConfig, uiService));
-        
+
         // Add the Enhanced Invoice Processor
         tasks.add(new EnhancedInvoiceProcessor(invoiceConfig, uiService));
 
         return tasks;
+    }
+
+    /**
+     * Start downloading emails from a specific year
+     *
+     * @param year The year to start from (0 for all years)
+     */
+    private static void startYearTask(int year) {
+        // Find the appropriate task name based on the year
+        String taskName;
+        if (year == 0) {
+            taskName = "Full Email Sync";
+        } else if (year == Year.now().getValue()) {
+            taskName = "Current Year Email Sync";
+        } else if (year == Year.now().getValue() - 1) {
+            taskName = "Last Year Email Sync";
+        } else if (year == Year.now().getValue() - 5) {
+            taskName = "Last 5 Years Email Sync";
+        } else {
+            taskName = "Year " + year + " Email Sync";
+        }
+
+        // Start the task with the system tray app
+        if (systemTrayApp != null) {
+            LOGGER.info("Starting task: " + taskName);
+            systemTrayApp.startTask(taskName);
+        } else {
+            LOGGER.warning("Cannot start task: " + taskName + " - systemTrayApp is null");
+        }
     }
 }

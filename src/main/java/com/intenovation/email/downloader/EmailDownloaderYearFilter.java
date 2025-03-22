@@ -5,6 +5,7 @@ import com.intenovation.appfw.systemtray.*;
 import javax.mail.*;
 import javax.mail.search.ComparisonTerm;
 import javax.mail.search.ReceivedDateTerm;
+import javax.mail.search.SearchTerm;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -15,39 +16,48 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Handles downloading emails from IMAP server
+ * Extension to EmailDownloader with year-based filtering capabilities.
+ * Uses the same methods as EmailDownloader but adds year filtering.
  */
-public class EmailDownloader extends BackgroundTask {
-    private static final Logger LOGGER = Logger.getLogger(EmailDownloader.class.getName());
-    private final boolean newOnly;
+public class EmailDownloaderYearFilter extends BackgroundTask {
+    private static final Logger LOGGER = Logger.getLogger(EmailDownloaderYearFilter.class.getName());
+    private final int startYear;
 
     /**
-     * Create a new Email Downloader task for full sync
+     * Create a new Email Downloader task for year-filtered sync
+     * 
+     * @param startYear The year to start downloading from (0 for all years)
      */
-    public EmailDownloader() {
-        this(false, "Full Email Sync", "Downloads all emails from the IMAP server that aren't already downloaded", 3600 * 12);
+    public EmailDownloaderYearFilter(int startYear) {
+        super(
+                getTaskName(startYear),
+                "Downloads emails starting from year " + (startYear > 0 ? startYear : "all"), 
+                3600 * 12, // 12 hour interval
+                true      // Available in menu
+        );
+        this.startYear = startYear;
     }
 
     /**
-     * Create a new Email Downloader task for new emails only
-     *
-     * @param syncIntervalMinutes Sync interval in minutes
+     * Get a descriptive task name based on the year
+     * 
+     * @param year The year to filter from
+     * @return A descriptive task name
      */
-    public EmailDownloader(int syncIntervalMinutes) {
-        this(true, "New Emails Only", "Downloads only new emails since last check", syncIntervalMinutes * 60);
-    }
-
-    /**
-     * Private constructor with common initialization
-     *
-     * @param newOnly Whether to download only new emails
-     * @param name Task name
-     * @param description Task description
-     * @param intervalSeconds Interval in seconds
-     */
-    private EmailDownloader(boolean newOnly, String name, String description, int intervalSeconds) {
-        super(name, description, intervalSeconds, true);
-        this.newOnly = newOnly;
+    private static String getTaskName(int year) {
+        int currentYear = Calendar.getInstance().get(Calendar.YEAR);
+        
+        if (year == 0) {
+            return "Full Email Sync";
+        } else if (year == currentYear) {
+            return "Current Year Email Sync";
+        } else if (year == currentYear - 1) {
+            return "Last Year Email Sync";
+        } else if (year == currentYear - 5) {
+            return "Last 5 Years Email Sync";
+        } else {
+            return "Year " + year + " Email Sync";
+        }
     }
 
     /**
@@ -59,7 +69,7 @@ public class EmailDownloader extends BackgroundTask {
      */
     @Override
     public String execute(ProgressStatusCallback callback) throws InterruptedException {
-        LOGGER.info("Starting " + (newOnly ? "New Emails Sync" : "Full Email Sync"));
+        LOGGER.info("Starting Email Sync from year " + (startYear > 0 ? startYear : "all years"));
 
         // Create a logging wrapper around the callback
         ProgressStatusCallback loggingCallback = new ProgressStatusCallback() {
@@ -69,66 +79,36 @@ public class EmailDownloader extends BackgroundTask {
                 callback.update(percent, message);
 
                 // Log the progress
-                LOGGER.info(String.format("[%s] %d%% - %s",
-                        (newOnly ? "New Emails Sync" : "Full Email Sync"),
+                LOGGER.info(String.format("[Email Sync from year %s] %d%% - %s",
+                        (startYear > 0 ? startYear : "all"),
                         percent, message));
             }
         };
 
         try {
-            // Execute the download with our logging callback
-            String result;
-            if (newOnly) {
-                result = downloadNewEmails(loggingCallback);
-            } else {
-                result = downloadAllEmails(loggingCallback);
-            }
-
-            LOGGER.info((newOnly ? "New Emails Sync" : "Full Email Sync") + " completed: " + result);
+            // Execute the download with our year filter
+            String result = downloadEmailsFromYear(loggingCallback, startYear);
+            LOGGER.info("Email Sync from year " + (startYear > 0 ? startYear : "all") + " completed: " + result);
             return result;
         } catch (InterruptedException e) {
-            LOGGER.warning((newOnly ? "New Emails Sync" : "Full Email Sync") + " was interrupted");
+            LOGGER.warning("Email Sync from year " + (startYear > 0 ? startYear : "all") + " was interrupted");
             throw e;
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, (newOnly ? "New Emails Sync" : "Full Email Sync") + " error", e);
+            LOGGER.log(Level.SEVERE, "Email Sync from year " + (startYear > 0 ? startYear : "all") + " error", e);
             return "Error: " + e.getMessage();
         }
     }
 
     /**
-     * Download all emails from the IMAP server
+     * Download emails from a specific year onwards
      *
      * @param progressUpdater Function to report progress
+     * @param startYear Year to start downloading from
      * @return Status message
      * @throws InterruptedException if task is cancelled
      */
-    public static String downloadAllEmails(ProgressStatusCallback progressUpdater)
+    public static String downloadEmailsFromYear(ProgressStatusCallback progressUpdater, int startYear)
             throws InterruptedException {
-        return downloadEmails(progressUpdater, false);
-    }
-
-    /**
-     * Download only new emails from the IMAP server
-     *
-     * @param progressUpdater Function to report progress
-     * @return Status message
-     * @throws InterruptedException if task is cancelled
-     */
-    public static String downloadNewEmails(ProgressStatusCallback progressUpdater)
-            throws InterruptedException {
-        return downloadEmails(progressUpdater, true);
-    }
-
-    /**
-     * Download emails from the IMAP server
-     *
-     * @param progressUpdater Function to report progress
-     * @param newOnly Whether to download only new emails
-     * @return Status message
-     * @throws InterruptedException if task is cancelled
-     */
-    private static String downloadEmails(ProgressStatusCallback progressUpdater,
-                                         boolean newOnly) throws InterruptedException {
         // Get settings from ImapDownloader
         String imapHost = ImapDownloader.getImapHost();
         String imapPort = ImapDownloader.getImapPort();
@@ -147,29 +127,9 @@ public class EmailDownloader extends BackgroundTask {
 
         // Index existing message IDs to avoid duplicate downloads
         Set<String> existingMessageIds = ConcurrentHashMap.newKeySet();
-        if (!newOnly) {
-            progressUpdater.update(5, "Indexing existing messages to avoid duplicates...");
-            indexExistingMessages(baseDir, existingMessageIds);
-            progressUpdater.update(10, "Found " + existingMessageIds.size() + " existing messages");
-        }
-
-        // Create .lastSync file to track last sync time
-        File lastSyncFile = new File(baseDir, ".lastSync");
-        Date lastSyncDate = null;
-
-        if (newOnly && lastSyncFile.exists()) {
-            try {
-                String dateString = Files.readAllLines(lastSyncFile.toPath()).get(0);
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-                lastSyncDate = sdf.parse(dateString);
-                progressUpdater.update(5, "Downloading emails since " + dateString);
-            } catch (Exception e) {
-                LOGGER.log(Level.WARNING, "Error reading last sync date", e);
-                // Continue without last sync date
-                lastSyncDate = null;
-                progressUpdater.update(5, "Last sync date not available, downloading all new emails");
-            }
-        }
+        progressUpdater.update(5, "Indexing existing messages to avoid duplicates...");
+        indexExistingMessages(baseDir, existingMessageIds);
+        progressUpdater.update(10, "Found " + existingMessageIds.size() + " existing messages");
 
         try {
             // Set up connection properties
@@ -207,28 +167,46 @@ public class EmailDownloader extends BackgroundTask {
             int downloadedEmails = 0;
             int skippedEmails = 0;
 
-            // First pass to count total emails
-            if (!newOnly) { // Only count for full sync
-                progressUpdater.update(15, "Counting emails...");
-                for (Folder folder : folders) {
-                    // Skip non-selectable folders
-                    if ((folder.getType() & Folder.HOLDS_MESSAGES) == 0) {
-                        continue;
-                    }
+            // First pass to count total emails with year filter
+            progressUpdater.update(15, "Counting emails...");
+            
+            // Prepare year search term if needed
+            Calendar cal = Calendar.getInstance();
+            if (startYear > 0) {
+                cal.set(startYear, Calendar.JANUARY, 1, 0, 0, 0);
+                cal.set(Calendar.MILLISECOND, 0);
+                progressUpdater.update(15, "Filtering emails from year " + startYear + " onwards");
+            }
+            
+            for (Folder folder : folders) {
+                // Skip non-selectable folders
+                if ((folder.getType() & Folder.HOLDS_MESSAGES) == 0) {
+                    continue;
+                }
 
-                    try {
-                        folder.open(Folder.READ_ONLY);
+                try {
+                    folder.open(Folder.READ_ONLY);
+                    
+                    // Apply year filter if specified
+                    if (startYear > 0) {
+                        // Create search term for emails received on or after startYear
+                        SearchTerm dateTerm = new ReceivedDateTerm(
+                            ComparisonTerm.GE, cal.getTime());
+                        Message[] filteredMessages = folder.search(dateTerm);
+                        totalEmails += filteredMessages.length;
+                    } else {
                         totalEmails += folder.getMessageCount();
-                        folder.close(false);
-                    } catch (MessagingException e) {
-                        LOGGER.log(Level.WARNING, "Error counting messages in folder: " + folder.getName(), e);
                     }
+                    
+                    folder.close(false);
+                } catch (MessagingException e) {
+                    LOGGER.log(Level.WARNING, "Error counting messages in folder: " + folder.getName(), e);
+                }
 
-                    // Check for interruption
-                    if (Thread.currentThread().isInterrupted()) {
-                        store.close();
-                        throw new InterruptedException("Task cancelled");
-                    }
+                // Check for interruption
+                if (Thread.currentThread().isInterrupted()) {
+                    store.close();
+                    throw new InterruptedException("Task cancelled");
                 }
             }
 
@@ -259,12 +237,15 @@ public class EmailDownloader extends BackgroundTask {
                         messagesDir.mkdirs();
                     }
 
-                    // Get messages from this folder
+                    // Get messages from this folder with year filtering
                     Message[] messages;
-
-                    if (newOnly && lastSyncDate != null) {
-                        // Get only messages since last sync
-                        messages = folder.search(new ReceivedDateTerm(ComparisonTerm.GE, lastSyncDate));
+                    if (startYear > 0) {
+                        // Get only messages from startYear onwards
+                        Calendar yearCal = Calendar.getInstance();
+                        yearCal.set(startYear, Calendar.JANUARY, 1, 0, 0, 0);
+                        yearCal.set(Calendar.MILLISECOND, 0);
+                        SearchTerm dateTerm = new ReceivedDateTerm(ComparisonTerm.GE, yearCal.getTime());
+                        messages = folder.search(dateTerm);
                     } else {
                         // Get all messages
                         messages = folder.getMessages();
@@ -300,7 +281,7 @@ public class EmailDownloader extends BackgroundTask {
                                         Math.abs(subject.hashCode());
                             }
 
-                            // Skip if this message already exists and we're only getting new messages
+                            // Skip if this message already exists
                             String sanitizedId = FileUtils.sanitizeFileName(messageId);
                             File msgDir = new File(messagesDir, sanitizedId);
                             
@@ -324,16 +305,10 @@ public class EmailDownloader extends BackgroundTask {
                             
                             downloadedEmails++;
 
-                            // Update progress for full sync
-                            if (!newOnly && totalEmails > 0) {
-                                int emailProgress = 20 + (75 * (downloadedEmails + skippedEmails) / totalEmails);
-                                progressUpdater.update(Math.min(95, emailProgress), "Downloaded " + 
-                                    downloadedEmails + " new emails, skipped " + skippedEmails + " existing emails");
-                            } else {
-                                // For new emails, use a simpler progress calculation
-                                progressUpdater.update(20 + (75 * (i + 1) / Math.max(1, messages.length)),
-                                    "Downloaded " + downloadedEmails + " new emails, skipped " + skippedEmails + " existing emails");
-                            }
+                            // Update progress
+                            int emailProgress = 20 + (75 * (downloadedEmails + skippedEmails) / totalEmails);
+                            progressUpdater.update(Math.min(95, emailProgress), "Downloaded " + 
+                                downloadedEmails + " new emails, skipped " + skippedEmails + " existing emails");
 
                             // Update status message periodically
                             if (downloadedEmails % 10 == 0 || i == messages.length - 1) {
@@ -367,6 +342,7 @@ public class EmailDownloader extends BackgroundTask {
             store.close();
 
             // Update last sync time
+            File lastSyncFile = new File(baseDir, ".lastSync");
             try {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
                 Files.write(lastSyncFile.toPath(),
@@ -398,11 +374,10 @@ public class EmailDownloader extends BackgroundTask {
         }
     }
 
+    // The following methods are copied from EmailDownloader to avoid dependencies
+    
     /**
      * Index existing message IDs to avoid re-downloading
-     *
-     * @param baseDir The base directory containing email folders
-     * @param existingIds Set to populate with existing message IDs
      */
     private static void indexExistingMessages(File baseDir, Set<String> existingIds) {
         // Get all folders
@@ -491,9 +466,6 @@ public class EmailDownloader extends BackgroundTask {
 
     /**
      * Get the Message-ID header from an email message
-     *
-     * @param message The email message
-     * @return The Message-ID or null if not found
      */
     private static String getMessageId(Message message) {
         try {
@@ -509,12 +481,8 @@ public class EmailDownloader extends BackgroundTask {
 
     /**
      * Save the content of an email message to files
-     *
-     * @param msgDir The message directory
-     * @param message The email message
-     * @throws Exception If an error occurs
      */
-    static void saveMessageContent(File msgDir, Message message) throws Exception {
+    private static void saveMessageContent(File msgDir, Message message) throws Exception {
         Object content = message.getContent();
 
         // Create content.txt for the main message content
@@ -550,10 +518,6 @@ public class EmailDownloader extends BackgroundTask {
 
     /**
      * Process a multipart message
-     *
-     * @param multipart The multipart content
-     * @param writer The writer for the main content
-     * @param msgDir The message directory
      */
     private static void processMultipart(Multipart multipart, FileWriter writer, File msgDir) throws Exception {
         int count = multipart.getCount();
@@ -622,13 +586,8 @@ public class EmailDownloader extends BackgroundTask {
 
     /**
      * Save message properties to a file
-     *
-     * @param msgDir The message directory
-     * @param message The message
-     * @throws MessagingException If a messaging error occurs
-     * @throws IOException If an I/O error occurs
      */
-    static void saveMessageProperties(File msgDir, Message message)
+    private static void saveMessageProperties(File msgDir, Message message)
             throws MessagingException, IOException {
         Properties props = new Properties();
 
@@ -661,7 +620,7 @@ public class EmailDownloader extends BackgroundTask {
             props.setProperty("from", from.toString());
         }
 
-        // Reply-To (Add this new section)
+        // Reply-To
         Address[] replyToAddresses = message.getReplyTo();
         if (replyToAddresses != null && replyToAddresses.length > 0) {
             StringBuilder replyTo = new StringBuilder();
