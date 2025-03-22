@@ -52,12 +52,10 @@ public class EnhancedInvoiceProcessor extends BackgroundTask {
         // Initialize specialized components
         this.parser = new InvoiceParser();
         this.reportGenerator = new InvoiceReportGenerator();
-        this.storage = new InvoiceStorage(config.getOutputDirectory());
-
         // Create output directory if it doesn't exist
-        if (!config.getOutputDirectory().exists()) {
-            config.getOutputDirectory().mkdirs();
-        }
+        File outputDirectory = new File(config.getOutputDirectory(), "EnhancedInvoiceProcessor");
+        outputDirectory.mkdirs();
+        this.storage = new InvoiceStorage(outputDirectory);
     }
 
     /**
