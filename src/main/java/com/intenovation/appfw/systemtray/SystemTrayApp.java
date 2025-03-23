@@ -425,9 +425,16 @@ public class SystemTrayApp {
             bottomPanel.add(closeButton);
             content.add(bottomPanel);
 
-            statusDialog.add(content);
+            // Wrap content in a scroll pane
+            JScrollPane scrollPane = new JScrollPane(content);
+            scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+            scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+
+            statusDialog.add(scrollPane);
             statusDialog.pack();
             statusDialog.setMinimumSize(new Dimension(400, 300));
+            // Set preferred size to better handle larger content
+            statusDialog.setPreferredSize(new Dimension(500, 400));
             statusDialog.setLocationRelativeTo(null);
             statusDialog.setVisible(true);
         });
