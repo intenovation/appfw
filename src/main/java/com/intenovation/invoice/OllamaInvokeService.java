@@ -54,7 +54,7 @@ public class OllamaInvokeService {
             
             // Create options for the API call
             OptionsBuilder options = new OptionsBuilder()
-                    .setTemperature(0.1f)  // Low temperature for more deterministic outputs
+                    .setTemperature(0.0f)  // Low temperature for more deterministic outputs
                     .setNumPredict(maxTokens);
             
             // Call Ollama API
