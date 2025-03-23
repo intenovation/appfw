@@ -10,6 +10,7 @@ public class Invoice {
         Sender of the invoice
          */
 	String email="";
+	String company = "";
 	double amount = 0.0;
 	String fileName = "";
 	String subject = "";

@@ -1,5 +1,7 @@
 package com.intenovation.email.reader;
 
+import com.intenovation.email.utils.EmailAddressSanitizer;
+
 import javax.mail.*;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
@@ -15,8 +17,6 @@ import java.util.logging.Logger;
 
 /**
  * A local implementation of the JavaMail Message class that reads from the filesystem.
- * No major changes needed for the new file structure since this class works with a message
- * directory regardless of where it's located.
  */
 class LocalMessage extends MimeMessage {
     private static final Logger LOGGER = Logger.getLogger(LocalMessage.class.getName());
@@ -32,6 +32,7 @@ class LocalMessage extends MimeMessage {
     private Flags flags;
     private String content;
     private boolean loaded = false;
+    private String replyTo;
 
     /**
      * Create a new LocalMessage
@@ -75,7 +76,7 @@ class LocalMessage extends MimeMessage {
                 // Get basic fields
                 this.subject = properties.getProperty("subject");
                 this.from = properties.getProperty("from");
-                this.replyTo = properties.getProperty("reply.to"); // Add this line
+                this.replyTo = properties.getProperty("reply.to");
 
                 String toStr = properties.getProperty("to");
                 if (toStr != null) {
@@ -200,45 +201,19 @@ class LocalMessage extends MimeMessage {
         }
 
         try {
-            return new Address[]{new InternetAddress(from)};
-        } catch (Exception e) {
-            try {
-                // If the address is invalid, try to create it anyway but mark it as non-strict
-                return new Address[]{new InternetAddress(from, false)};
-            } catch (Exception e2) {
-                LOGGER.log(Level.WARNING, "Error parsing from address: " + from, e2);
-                LOGGER.log(Level.INFO, this.properties.toString());
-
-                // Create a custom address as last resort
-                String cleanedAddress = from.replaceAll("[\\s:;,<>]", "");
-                int atIndex = cleanedAddress.indexOf('@');
-                if (atIndex > 0) {
-                    try {
-                        return new Address[]{new InternetAddress(cleanedAddress)};
-                    } catch (Exception e3) {
-                        // If still fails, create a dummy address
-                        try {
-                            if (from.contains("Emadco"))
-                                return new Address[]{new InternetAddress("Statement@emadcodisposal.com")};
-                            else
-                                return new Address[]{new InternetAddress("unknown@domain.com")};
-                        } catch (Exception e4) {
-                            // This should never happen
-                            return null;
-                        }
-                    }
-                } else {
-                    try {
-                        if (from.contains("Emadco"))
-                            return new Address[]{new InternetAddress("Statement@emadcodisposal.com")};
-                        else
-                            return new Address[]{new InternetAddress("unknown@domain.com")};
-                    } catch (Exception e4) {
-                        // This should never happen
-                        return null;
-                    }
-                }
+            // Sanitize the email address before processing
+            String sanitizedFrom = EmailAddressSanitizer.sanitizeEmailAddress(from);
+            if (sanitizedFrom != null) {
+                return new Address[]{new InternetAddress(sanitizedFrom)};
+            } else {
+                // If sanitization failed completely, log warning and return fallback
+                LOGGER.log(Level.WARNING, "Unable to sanitize from address: " + from);
+                return new Address[]{new InternetAddress("unknown@domain.com")};
             }
+        } catch (Exception e) {
+            LOGGER.log(Level.WARNING, "Error creating InternetAddress after sanitization: " + from, e);
+            // Create a fallback address as last resort
+            return new Address[]{new InternetAddress("unknown@domain.com")};
         }
     }
 
@@ -247,20 +222,24 @@ class LocalMessage extends MimeMessage {
         if (type == RecipientType.TO && to != null) {
             Address[] addresses = new Address[to.length];
             for (int i = 0; i < to.length; i++) {
+                // Sanitize each recipient address
+                String sanitized = EmailAddressSanitizer.sanitizeEmailAddress(to[i]);
                 try {
-                    addresses[i] = new InternetAddress(to[i]);
+                    addresses[i] = new InternetAddress(sanitized != null ? sanitized : "recipient@example.com");
                 } catch (Exception e) {
-                    addresses[i] = new InternetAddress(to[i], true);
+                    addresses[i] = new InternetAddress("recipient@example.com");
                 }
             }
             return addresses;
         } else if (type == RecipientType.CC && cc != null) {
             Address[] addresses = new Address[cc.length];
             for (int i = 0; i < cc.length; i++) {
+                // Sanitize each CC address
+                String sanitized = EmailAddressSanitizer.sanitizeEmailAddress(cc[i]);
                 try {
-                    addresses[i] = new InternetAddress(cc[i]);
+                    addresses[i] = new InternetAddress(sanitized != null ? sanitized : "cc@example.com");
                 } catch (Exception e) {
-                    addresses[i] = new InternetAddress(cc[i], true);
+                    addresses[i] = new InternetAddress("cc@example.com");
                 }
             }
             return addresses;
@@ -280,7 +259,6 @@ class LocalMessage extends MimeMessage {
         loadContent();
         return content != null ? new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)) : null;
     }
-    private String replyTo;
 
     @Override
     public Address[] getReplyTo() throws MessagingException {
@@ -294,17 +272,13 @@ class LocalMessage extends MimeMessage {
             Address[] addresses = new Address[replyToAddresses.length];
 
             for (int i = 0; i < replyToAddresses.length; i++) {
-                try {
-                    addresses[i] = new InternetAddress(replyToAddresses[i]);
-                } catch (Exception e) {
-                    // Try non-strict parsing
-                    try {
-                        addresses[i] = new InternetAddress(replyToAddresses[i], false);
-                    } catch (Exception e2) {
-                        // If all else fails, create a dummy address
-                        LOGGER.log(Level.WARNING, "Error parsing reply-to address: " + replyToAddresses[i], e2);
-                        addresses[i] = new InternetAddress("unknown@domain.com");
-                    }
+                // Sanitize each reply-to address
+                String sanitized = EmailAddressSanitizer.sanitizeEmailAddress(replyToAddresses[i]);
+                if (sanitized != null) {
+                    addresses[i] = new InternetAddress(sanitized);
+                } else {
+                    LOGGER.log(Level.WARNING, "Unable to sanitize reply-to address: " + replyToAddresses[i]);
+                    addresses[i] = new InternetAddress("replyto@example.com");
                 }
             }
             return addresses;

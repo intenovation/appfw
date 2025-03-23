@@ -32,6 +32,9 @@ public class EnhancedInvoiceProcessor extends BackgroundTask {
     private final InvoiceReportGenerator reportGenerator;
     private final InvoiceStorage storage;
 
+    // For tracking statistics
+    private final Map<String, List<Invoice>> statistics = new HashMap<>();
+
     /**
      * Create a new enhanced invoice processor task with dependencies
      *
@@ -70,7 +73,6 @@ public class EnhancedInvoiceProcessor extends BackgroundTask {
     public String execute(ProgressStatusCallback callback) throws InterruptedException {
         callback.update(0, "Initializing enhanced invoice processor...");
 
-        Map<String, List<Invoice>> invoicesByFolder = new HashMap<>();
         Store store = null;
         int totalInvoicesFound = 0;
 
@@ -126,6 +128,7 @@ public class EnhancedInvoiceProcessor extends BackgroundTask {
 
                     // Process messages in this folder
                     Message[] messages = folder.getMessages();
+                    int folderInvoicesCount = 0;
                     List<Invoice> folderInvoices = new ArrayList<>();
 
                     for (int i = 0; i < messages.length; i++) {
@@ -139,7 +142,12 @@ public class EnhancedInvoiceProcessor extends BackgroundTask {
                             List<Invoice> messageInvoices = processMessage(message, callback);
 
                             if (!messageInvoices.isEmpty()) {
+                                // Save invoices immediately
+                                storage.saveInvoicesToFolders(messageInvoices);
+
+                                // Keep track of invoices for statistics
                                 folderInvoices.addAll(messageInvoices);
+                                folderInvoicesCount += messageInvoices.size();
                                 totalInvoicesFound += messageInvoices.size();
                             }
 
@@ -156,8 +164,9 @@ public class EnhancedInvoiceProcessor extends BackgroundTask {
                         }
                     }
 
+                    // Store folder statistics
                     if (!folderInvoices.isEmpty()) {
-                        invoicesByFolder.put(folder.getFullName(), folderInvoices);
+                        statistics.put(folder.getFullName(), folderInvoices);
                     }
 
                     folder.close(false);
@@ -168,22 +177,17 @@ public class EnhancedInvoiceProcessor extends BackgroundTask {
                 }
             }
 
-            // Step 4: Generate reports and save results
-            callback.update(90, "Saving invoice data and generating reports...");
+            // Step 4: Generate reports using collected statistics
+            callback.update(90, "Generating reports...");
 
             if (totalInvoicesFound == 0) {
                 callback.update(100, "No invoices found");
                 return "No invoices found in the email archive";
             }
 
-            // Save invoice data to organized folders
-            for (Map.Entry<String, List<Invoice>> entry : invoicesByFolder.entrySet()) {
-                storage.saveInvoicesToFolders(entry.getValue());
-            }
-
             // Flatten all invoices for the main report
             List<Invoice> allInvoices = new ArrayList<>();
-            for (List<Invoice> folderInvoices : invoicesByFolder.values()) {
+            for (List<Invoice> folderInvoices : statistics.values()) {
                 allInvoices.addAll(folderInvoices);
             }
 
