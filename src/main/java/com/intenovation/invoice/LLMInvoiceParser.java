@@ -2,6 +2,7 @@ package com.intenovation.invoice;
 
 import org.json.JSONObject;
 import org.json.JSONException;
+import org.jsoup.Jsoup;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -35,14 +36,21 @@ public class LLMInvoiceParser {
      */
     public Invoice parseWithLLM(String content, Invoice baseInvoice) {
         try {
+            // Check if content is HTML and extract text if needed
+            String textContent = content;
+            if (isHtmlContent(textContent)) {
+                textContent = Jsoup.parse(textContent).text();
+                LOGGER.info("Extracted text from HTML content for LLM processing");
+            }
+
             // Create a shorter prompt if content is very large
             String promptContent;
-            if (content.length() > 10000) {
-                LOGGER.info("Content is very large (" + content.length() +
+            if (textContent.length() > 10000) {
+                LOGGER.info("Content is very large (" + textContent.length() +
                         " chars), truncating to 10000 chars");
-                promptContent = content.substring(0, 10000);
+                promptContent = textContent.substring(0, 10000);
             } else {
-                promptContent = content;
+                promptContent = textContent;
             }
 
             // Create the prompt
@@ -63,6 +71,21 @@ public class LLMInvoiceParser {
             LOGGER.log(Level.WARNING, "Error in LLM parsing: " + e.getMessage(), e);
             return null;
         }
+    }
+
+    /**
+     * Check if the content is likely HTML
+     * @param content The content to check
+     * @return True if the content appears to be HTML
+     */
+    private boolean isHtmlContent(String content) {
+        if (content == null) return false;
+
+        String trimmedContent = content.trim().toLowerCase();
+        return trimmedContent.startsWith("<!doctype html") ||
+                trimmedContent.startsWith("<html") ||
+                (trimmedContent.contains("<body") && trimmedContent.contains("</body>")) ||
+                (trimmedContent.contains("<div") && trimmedContent.contains("</div>"));
     }
 
     /**
@@ -99,7 +122,7 @@ public class LLMInvoiceParser {
                 "Return ONLY the JSON with no explanations or other text.\n\n" +
                 "Here is the content to analyze:\n\n" +
                 content+
-                ":\n\n this is the end of the content. Now here respond with the JSON:\n\n" ;
+                "\n\nThis is the end of the content. Now respond with the JSON:\n\n";
     }
 
     /**

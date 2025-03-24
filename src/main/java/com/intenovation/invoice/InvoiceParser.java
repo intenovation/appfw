@@ -127,16 +127,24 @@ public class InvoiceParser {
      * Process text content to extract invoice details
      */
     private boolean processTextContent(Invoice invoice, String content) {
+        // Check if content is HTML and extract text if needed
+        String textContent = content;
+        if (isHtmlContent(textContent)) {
+            textContent = Jsoup.parse(textContent).text();
+            LOGGER.info("Extracted text from HTML content for processing");
+            invoice.setParse(invoice.getParse() + "+html_extracted");
+        }
+
         // Detect document type
-        invoice.setType(Type.detectType(content));
+        invoice.setType(Type.detectType(textContent));
 
         // Try rule-based extraction first
-        boolean success = extractInvoiceDetails(invoice, content);
+        boolean success = extractInvoiceDetails(invoice, textContent);
 
         // If rule-based extraction failed and Ollama fallback is enabled, try Ollama parsing
         if (!success && config.isUseOllamaFallback()) {
             LOGGER.info("Rule-based parsing failed, attempting Ollama parsing");
-            Invoice llmInvoice = llmParser.parseWithLLM(content, invoice);
+            Invoice llmInvoice = llmParser.parseWithLLM(textContent, invoice);
 
             if (llmInvoice != null) {
                 // Copy relevant fields from Ollama-parsed invoice
@@ -149,6 +157,21 @@ public class InvoiceParser {
         }
 
         return success;
+    }
+
+    /**
+     * Check if the content is likely HTML
+     * @param content The content to check
+     * @return True if the content appears to be HTML
+     */
+    private boolean isHtmlContent(String content) {
+        if (content == null) return false;
+
+        String trimmedContent = content.trim().toLowerCase();
+        return trimmedContent.startsWith("<!doctype html") ||
+                trimmedContent.startsWith("<html") ||
+                (trimmedContent.contains("<body") && trimmedContent.contains("</body>")) ||
+                (trimmedContent.contains("<div") && trimmedContent.contains("</div>"));
     }
 
     /**
@@ -223,7 +246,7 @@ public class InvoiceParser {
                     results.add(textInvoice);
                 }
             } else if (contentType.contains("text/html")) {
-                // Process HTML part
+                // Process HTML part - extract text from HTML for better processing
                 Invoice htmlInvoice = cloneInvoice(baseInvoice);
                 htmlInvoice.setParse("html_part");
                 String htmlContent = bodyPart.getContent().toString();
