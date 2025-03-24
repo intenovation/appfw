@@ -147,9 +147,33 @@ public class InvoiceStorage {
             return null;
         }
 
+        // Handle email addresses that might be enclosed in angle brackets
+        if (email.contains("<") && email.contains(">")) {
+            int start = email.indexOf("<");
+            int end = email.indexOf(">");
+            if (start < end && email.substring(start, end).contains("@")) {
+                email = email.substring(start + 1, end);
+            }
+        }
+
         String[] parts = email.split("@");
         if (parts.length == 2) {
-            return parts[1];
+            String domain = parts[1];
+
+            // Clean up any trailing characters
+            domain = domain.trim();
+
+            // Remove trailing ">" that might be present in some email addresses
+            if (domain.endsWith(">")) {
+                domain = domain.substring(0, domain.length() - 1);
+            }
+
+            // Remove any trailing punctuation or special characters
+            while (domain.length() > 0 && !Character.isLetterOrDigit(domain.charAt(domain.length() - 1))) {
+                domain = domain.substring(0, domain.length() - 1);
+            }
+
+            return domain;
         }
 
         return null;
@@ -199,6 +223,11 @@ public class InvoiceStorage {
 
         // Trim leading/trailing whitespace and dots
         sanitized = sanitized.replaceAll("^[\\s\\.]+|[\\s\\.]+$", "");
+
+        // Remove trailing underscores
+        while (sanitized.endsWith("_")) {
+            sanitized = sanitized.substring(0, sanitized.length() - 1);
+        }
 
         // Limit length to avoid file system issues
         if (sanitized.length() > 100) {
