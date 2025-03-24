@@ -25,7 +25,7 @@ public class InvoiceParser {
     // Regular expressions for extracting invoice information
     private static final Pattern[] AMOUNT_PATTERNS = {
             // German style
-            Pattern.compile("(?i)(Gesamtbetrag\\s*\\(brutto\\)|Gesamtsumme|Rechnungsbetrag in Höhe von|Rechnungsbetrag:|Rechnungsbetrag von|Zu zahlender Betrag:|Endbetrag EUR|Brutto)\\s*[€]?\\s*([\\d.,]+)"),
+            Pattern.compile("(?i)(Gesamtbetrag\\s*\\(brutto\\)|Gesamtsumme|Rechnungsbetrag in Höhe von|Rechnungsbetrag:|Rechnungsbetrag von|Zu zahlender Betrag:|Endbetrag EUR|Brutto|Betrag beläuft sich auf)\\s*[€]?\\s*([\\d.,]+)"),
             // English style
             Pattern.compile("(?i)(Total Charges:|Total Amount Due:|Total Balance Due:|a payment of|Total due now:|Total Due|Statement Amount:|Amount due:|Amount Due:|Amount:|The amount of|Invoice amount|invoice total is|Total\\$|Original Charge|Total Charged|Payment amount:|BALANCE DUE|Current charges:|Total \\(USD\\):|Total \\$|TOTAL \\$|Amount Received|Amount due on this invoice:|Total|Statement balance:|Statement balance|Amount Charged \\$|PAY THIS AMOUNT:|outstanding balance of|TOTAL|Amount paid|DETAILS)\\s*[\\$£]?\\s*([\\d.,]+)"),
             // General pattern
