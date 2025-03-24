@@ -52,13 +52,15 @@ public class InvoiceStorage {
      * @param invoices The list of invoices to save
      */
     public void saveInvoicesToFolders(List<Invoice> invoices) {
-        // Group invoices by year, domain, email, and message ID
+        // Group invoices by year, domain, email, and date+subject
         Map<Integer, Map<String, Map<String, Map<String, List<Invoice>>>>> groupedInvoices = new HashMap<>();
 
         for (Invoice invoice : invoices) {
             int year = invoice.getYear();
             String email = invoice.getEmail();
-            String messageId = extractMessageId(invoice.getEmailId());
+
+            // Format date and subject for directory name
+            String dateSubjectDir = formatDateSubjectDirectory(invoice);
 
             // Extract domain from email address
             String domain = extractDomain(email);
@@ -81,13 +83,13 @@ public class InvoiceStorage {
                 emailMap.put(email, new HashMap<>());
             }
 
-            Map<String, List<Invoice>> messageMap = emailMap.get(email);
-            if (!messageMap.containsKey(messageId)) {
-                messageMap.put(messageId, new ArrayList<>());
+            Map<String, List<Invoice>> dateSubjectMap = emailMap.get(email);
+            if (!dateSubjectMap.containsKey(dateSubjectDir)) {
+                dateSubjectMap.put(dateSubjectDir, new ArrayList<>());
             }
 
             // Add invoice to the list
-            messageMap.get(messageId).add(invoice);
+            dateSubjectMap.get(dateSubjectDir).add(invoice);
         }
 
         // Save invoices to appropriate folders
@@ -100,9 +102,9 @@ public class InvoiceStorage {
                 for (Map.Entry<String, Map<String, List<Invoice>>> emailEntry : domainEntry.getValue().entrySet()) {
                     String email = emailEntry.getKey();
 
-                    for (Map.Entry<String, List<Invoice>> messageEntry : emailEntry.getValue().entrySet()) {
-                        String messageId = messageEntry.getKey();
-                        List<Invoice> messageInvoices = messageEntry.getValue();
+                    for (Map.Entry<String, List<Invoice>> dateSubjectEntry : emailEntry.getValue().entrySet()) {
+                        String dateSubjectDir = dateSubjectEntry.getKey();
+                        List<Invoice> dirInvoices = dateSubjectEntry.getValue();
 
                         // Create folder structure
                         File folderPath = new File(baseDirectory,
@@ -110,7 +112,7 @@ public class InvoiceStorage {
                                         year + File.separator +
                                         sanitizeFileName(domain) + File.separator +
                                         sanitizeFileName(email) + File.separator +
-                                        sanitizeFileName(messageId));
+                                        sanitizeFileName(dateSubjectDir));
 
                         if (!folderPath.exists()) {
                             folderPath.mkdirs();
@@ -127,7 +129,7 @@ public class InvoiceStorage {
                             }
 
                             // Write invoice data
-                            for (Invoice invoice : messageInvoices) {
+                            for (Invoice invoice : dirInvoices) {
                                 writer.write(invoice.toString());
                             }
                         } catch (IOException e) {
@@ -180,31 +182,26 @@ public class InvoiceStorage {
     }
 
     /**
-     * Extract message ID from the email ID
+     * Format date and subject into a directory name
+     * Uses format: YYYY-MM-DD_subject-line
      */
-    private String extractMessageId(String emailId) {
-        if (emailId == null || emailId.isEmpty()) {
-            return "unknown";
+    private String formatDateSubjectDirectory(Invoice invoice) {
+        // Format the date part (year-month-day)
+        String datePart = String.format("%04d-%02d-%02d",
+                invoice.getYear(),
+                invoice.getMonth(),
+                invoice.getDay());
+
+        // Get a shortened subject (first 50 chars max)
+        String subject = invoice.getSubject();
+        if (subject == null || subject.isEmpty()) {
+            subject = "no-subject";
+        } else if (subject.length() > 50) {
+            subject = subject.substring(0, 50);
         }
 
-        // If it's a file URL, get the last path component
-        if (emailId.startsWith("file:")) {
-            String[] parts = emailId.split("/");
-            if (parts.length > 0) {
-                return parts[parts.length - 1];
-            }
-        }
-
-        // If it contains angle brackets, extract the part between them
-        if (emailId.contains("<") && emailId.contains(">")) {
-            int start = emailId.indexOf("<") + 1;
-            int end = emailId.indexOf(">");
-            if (start < end) {
-                return emailId.substring(start, end);
-            }
-        }
-
-        return emailId;
+        // Combine date and subject
+        return datePart + "_" + subject;
     }
 
     /**
