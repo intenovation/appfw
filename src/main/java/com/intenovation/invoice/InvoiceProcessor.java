@@ -160,6 +160,32 @@ public class InvoiceProcessor extends BackgroundTask {
 
                     // Find potential invoice messages
                     Message[] messages = folder.getMessages();
+
+                    // ADD THIS SECTION: Sort messages by date (newest first)
+                    Arrays.sort(messages, (m1, m2) -> {
+                        try {
+                            Date date1 = m1.getReceivedDate();
+                            Date date2 = m2.getReceivedDate();
+
+                            // If received date is null, try sent date
+                            if (date1 == null) date1 = m1.getSentDate();
+                            if (date2 == null) date2 = m2.getSentDate();
+
+                            // If both dates are null, consider them equal
+                            if (date1 == null && date2 == null) return 0;
+
+                            // If only one date is null, put the non-null date first
+                            if (date1 == null) return 1;
+                            if (date2 == null) return -1;
+
+                            // Compare dates in reverse order (newest first)
+                            return date2.compareTo(date1);
+                        } catch (MessagingException e) {
+                            // In case of error, maintain original order
+                            return 0;
+                        }
+                    });
+
                     for (Message message : messages) {
                         try {
                             if (isPotentialInvoice(message)) {
