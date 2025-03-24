@@ -41,7 +41,7 @@ public class Aufbewahrung {
         System.out.println(Invoice.header());
         Statistic stat = new Statistic("Total");
         try {
-            store = LocalMail.openStore(new File("EmailArchive/appfw"));
+            store = LocalMail.openStore(new File("/Users/jens/src/tex/intenovation/Aufbewahrung/EmailArchive/"));
             Folder[] f = store.getDefaultFolder().list("*");
             for (Folder fd : f) {
                 //System.out.println(">> " + fd.getName());
@@ -310,7 +310,7 @@ public class Aufbewahrung {
                     "Your payment of $","Payment amount","Total charged","Payments","charged to your Bank Account is  $-","*Amount*","Summe ink l. USt",
                     "Endbetrag EUR","Total","received your payment of","Payment Amount:","in the amount of","Your donation total:","Your payment of **$",
                     "SUBTOTAL: $","Automatic payment amount","Amount","SUBTOTAL: $","SUBTOTAL:","Automatic payment amount","Brutto ","payment of","for this period is",
-                    "Amount","amount of","Total charged","Balance Due:","outstanding balance of","Bill Payment Amount","Total Payment");
+                    "Amount","amount of","Total charged","Balance Due:","outstanding balance of","Bill Payment Amount","Total Payment","Betrag beläuft sich auf");
             if (amountString == null || amountString.trim().length() < 2) {
                 //String mails="From:"+
                 String mailFile = storeUnparseMail(invoice.emailnumber,"unparsed", folderName, content, datString, parse, filename, "txt");
