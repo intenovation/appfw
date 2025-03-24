@@ -33,6 +33,7 @@ public class InvoiceProcessor extends BackgroundTask {
     // Configuration
     private final InvoiceConfiguration config;
     private final UIService uiService;
+    private   InvoiceStorage storage;
 
     /**
      * Create a new invoice processor task with dependencies
@@ -55,6 +56,9 @@ public class InvoiceProcessor extends BackgroundTask {
         if (!config.getOutputDirectory().exists()) {
             config.getOutputDirectory().mkdirs();
         }
+
+        // Initialize storage with process name
+        this.storage = new InvoiceStorage(config.getOutputDirectory(), "InvoiceProcessor");
     }
 
     /**
@@ -217,7 +221,10 @@ public class InvoiceProcessor extends BackgroundTask {
                 return "No invoices found in the email archive";
             }
 
-            // Generate invoice reports
+            // Save invoices using the new storage structure
+            storage.saveInvoicesToFolders(invoices);
+
+            // You can still generate the summary reports as before:
             String reportResult = generateReports(invoices);
 
             callback.update(100, "Completed: " + reportResult);

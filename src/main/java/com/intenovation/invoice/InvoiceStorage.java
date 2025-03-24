@@ -12,111 +12,177 @@ import java.util.logging.Logger;
 
 /**
  * Manages the storage of invoices to the file system.
- * Organizes invoices by year, domain, and email in a hierarchical folder structure.
+ * Organizes invoices by background process, year, email domain, email address, and message ID
+ * in a hierarchical folder structure.
  */
 public class InvoiceStorage {
     private static final Logger LOGGER = Logger.getLogger(InvoiceStorage.class.getName());
-    
+
     private final File baseDirectory;
-    
+    private final String processName;
+
     /**
      * Create a new invoice storage with the specified base directory
-     * 
+     *
      * @param baseDirectory The directory where invoices will be stored
      */
     public InvoiceStorage(File baseDirectory) {
+        this(baseDirectory, "InvoiceProcessor");
+    }
+
+    /**
+     * Create a new invoice storage with the specified base directory and process name
+     *
+     * @param baseDirectory The directory where invoices will be stored
+     * @param processName The name of the background process (used as top-level directory)
+     */
+    public InvoiceStorage(File baseDirectory, String processName) {
         this.baseDirectory = baseDirectory;
-        
+        this.processName = processName;
+
         // Ensure the base directory exists
         if (!baseDirectory.exists()) {
             baseDirectory.mkdirs();
         }
     }
-    
+
     /**
      * Save invoice data to organized folders
-     * 
+     *
      * @param invoices The list of invoices to save
      */
     public void saveInvoicesToFolders(List<Invoice> invoices) {
-        // Group invoices by year, domain, and email
-        Map<Integer, Map<String, Map<String, List<Invoice>>>> groupedInvoices = new HashMap<>();
-        
+        // Group invoices by year, domain, email, and message ID
+        Map<Integer, Map<String, Map<String, Map<String, List<Invoice>>>>> groupedInvoices = new HashMap<>();
+
         for (Invoice invoice : invoices) {
             int year = invoice.getYear();
-            String domain = invoice.getUtility();
             String email = invoice.getEmail();
-            
+            String messageId = extractMessageId(invoice.getEmailId());
+
+            // Extract domain from email address
+            String domain = extractDomain(email);
             if (domain == null || domain.isEmpty()) {
                 domain = "unknown";
             }
-            
+
             // Create nested structure if needed
             if (!groupedInvoices.containsKey(year)) {
                 groupedInvoices.put(year, new HashMap<>());
             }
-            
-            Map<String, Map<String, List<Invoice>>> domainMap = groupedInvoices.get(year);
+
+            Map<String, Map<String, Map<String, List<Invoice>>>> domainMap = groupedInvoices.get(year);
             if (!domainMap.containsKey(domain)) {
                 domainMap.put(domain, new HashMap<>());
             }
-            
-            Map<String, List<Invoice>> emailMap = domainMap.get(domain);
+
+            Map<String, Map<String, List<Invoice>>> emailMap = domainMap.get(domain);
             if (!emailMap.containsKey(email)) {
-                emailMap.put(email, new ArrayList<>());
+                emailMap.put(email, new HashMap<>());
             }
-            
+
+            Map<String, List<Invoice>> messageMap = emailMap.get(email);
+            if (!messageMap.containsKey(messageId)) {
+                messageMap.put(messageId, new ArrayList<>());
+            }
+
             // Add invoice to the list
-            emailMap.get(email).add(invoice);
+            messageMap.get(messageId).add(invoice);
         }
-        
+
         // Save invoices to appropriate folders
-        for (Map.Entry<Integer, Map<String, Map<String, List<Invoice>>>> yearEntry : groupedInvoices.entrySet()) {
+        for (Map.Entry<Integer, Map<String, Map<String, Map<String, List<Invoice>>>>> yearEntry : groupedInvoices.entrySet()) {
             int year = yearEntry.getKey();
-            
-            for (Map.Entry<String, Map<String, List<Invoice>>> domainEntry : yearEntry.getValue().entrySet()) {
+
+            for (Map.Entry<String, Map<String, Map<String, List<Invoice>>>> domainEntry : yearEntry.getValue().entrySet()) {
                 String domain = domainEntry.getKey();
-                
-                for (Map.Entry<String, List<Invoice>> emailEntry : domainEntry.getValue().entrySet()) {
+
+                for (Map.Entry<String, Map<String, List<Invoice>>> emailEntry : domainEntry.getValue().entrySet()) {
                     String email = emailEntry.getKey();
-                    List<Invoice> emailInvoices = emailEntry.getValue();
-                    
-                    // Create folder structure
-                    File folderPath = new File(baseDirectory, 
-                            year + File.separator + domain + File.separator + sanitizeFileName(email));
-                    
-                    if (!folderPath.exists()) {
-                        folderPath.mkdirs();
-                    }
-                    
-                    // Create a messages subfolder
-                    File messagesFolder = new File(folderPath, "messages");
-                    if (!messagesFolder.exists()) {
-                        messagesFolder.mkdirs();
-                    }
-                    
-                    // Create or append to invoices.tsv file
-                    File invoicesFile = new File(messagesFolder, "invoices.tsv");
-                    boolean fileExists = invoicesFile.exists();
-                    
-                    try (FileWriter writer = new FileWriter(invoicesFile, true)) {
-                        // Write header if file is new
-                        if (!fileExists) {
-                            writer.write(Invoice.header());
+
+                    for (Map.Entry<String, List<Invoice>> messageEntry : emailEntry.getValue().entrySet()) {
+                        String messageId = messageEntry.getKey();
+                        List<Invoice> messageInvoices = messageEntry.getValue();
+
+                        // Create folder structure
+                        File folderPath = new File(baseDirectory,
+                                processName + File.separator +
+                                        year + File.separator +
+                                        sanitizeFileName(domain) + File.separator +
+                                        sanitizeFileName(email) + File.separator +
+                                        sanitizeFileName(messageId));
+
+                        if (!folderPath.exists()) {
+                            folderPath.mkdirs();
                         }
-                        
-                        // Write invoice data
-                        for (Invoice invoice : emailInvoices) {
-                            writer.write(invoice.toString());
+
+                        // Create invoices.tsv file
+                        File invoicesFile = new File(folderPath, "invoices.tsv");
+                        boolean fileExists = invoicesFile.exists();
+
+                        try (FileWriter writer = new FileWriter(invoicesFile, true)) {
+                            // Write header if file is new
+                            if (!fileExists) {
+                                writer.write(Invoice.header());
+                            }
+
+                            // Write invoice data
+                            for (Invoice invoice : messageInvoices) {
+                                writer.write(invoice.toString());
+                            }
+                        } catch (IOException e) {
+                            LOGGER.log(Level.SEVERE, "Error writing to invoices.tsv", e);
                         }
-                    } catch (IOException e) {
-                        LOGGER.log(Level.SEVERE, "Error writing to invoices.tsv", e);
                     }
                 }
             }
         }
     }
-    
+
+    /**
+     * Extract domain from email address
+     */
+    private String extractDomain(String email) {
+        if (email == null || !email.contains("@")) {
+            return null;
+        }
+
+        String[] parts = email.split("@");
+        if (parts.length == 2) {
+            return parts[1];
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract message ID from the email ID
+     */
+    private String extractMessageId(String emailId) {
+        if (emailId == null || emailId.isEmpty()) {
+            return "unknown";
+        }
+
+        // If it's a file URL, get the last path component
+        if (emailId.startsWith("file:")) {
+            String[] parts = emailId.split("/");
+            if (parts.length > 0) {
+                return parts[parts.length - 1];
+            }
+        }
+
+        // If it contains angle brackets, extract the part between them
+        if (emailId.contains("<") && emailId.contains(">")) {
+            int start = emailId.indexOf("<") + 1;
+            int end = emailId.indexOf(">");
+            if (start < end) {
+                return emailId.substring(start, end);
+            }
+        }
+
+        return emailId;
+    }
+
     /**
      * Sanitize a file name for use in a file path
      */
@@ -124,21 +190,21 @@ public class InvoiceStorage {
         if (fileName == null || fileName.isEmpty()) {
             return "unnamed";
         }
-        
+
         // Replace invalid file name characters
         String sanitized = fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
-        
+
         // Replace multiple sequential invalid characters with a single underscore
         sanitized = sanitized.replaceAll("_+", "_");
-        
+
         // Trim leading/trailing whitespace and dots
         sanitized = sanitized.replaceAll("^[\\s\\.]+|[\\s\\.]+$", "");
-        
+
         // Limit length to avoid file system issues
         if (sanitized.length() > 100) {
             sanitized = sanitized.substring(0, 100);
         }
-        
+
         return sanitized.isEmpty() ? "unnamed" : sanitized;
     }
 }
