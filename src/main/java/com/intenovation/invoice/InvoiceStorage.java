@@ -11,7 +11,7 @@ import java.util.logging.Logger;
  * Manages the storage of invoices to the file system.
  * Organizes invoices by background process, year, email domain, email address, and message ID
  * in a hierarchical folder structure.
- * Now includes domain-based organization for tax purposes.
+ * Now includes domain-based organization for tax purposes within the same directory structure.
  */
 public class InvoiceStorage {
     private static final Logger LOGGER = Logger.getLogger(InvoiceStorage.class.getName());
@@ -146,15 +146,18 @@ public class InvoiceStorage {
 
     /**
      * Save invoices organized by domain, taking only the first with a reasonable amount
-     * for tax reporting purposes
+     * for tax reporting purposes. Uses the same directory structure as the main storage.
      *
      * @param invoices The list of invoices to save
      */
     private void saveToDomainFolders(List<Invoice> invoices) {
-        // Group invoices by email ID to find duplicates from different parse methods
+        // Track unique email IDs to avoid duplicates
+        Map<String, Invoice> bestInvoices = new HashMap<>();
+
+        // Group invoices by message/email ID
         Map<String, List<Invoice>> emailGroups = new HashMap<>();
 
-        // Group invoices by email ID
+        // First, group all invoices by their email ID
         for (Invoice invoice : invoices) {
             String emailId = invoice.getEmailId();
             if (!emailGroups.containsKey(emailId)) {
@@ -163,16 +166,17 @@ public class InvoiceStorage {
             emailGroups.get(emailId).add(invoice);
         }
 
-        // Filter groups to keep only the first invoice with a reasonable amount
-        List<Invoice> filteredInvoices = new ArrayList<>();
+        // For each group (same email), select the best invoice (first with reasonable amount)
+        for (Map.Entry<String, List<Invoice>> entry : emailGroups.entrySet()) {
+            String emailId = entry.getKey();
+            List<Invoice> groupInvoices = entry.getValue();
 
-        for (List<Invoice> group : emailGroups.values()) {
-            // Sort the group by amount to make selection more deterministic
-            group.sort(Comparator.comparingDouble(Invoice::getAmount));
+            // Sort by amount to be consistent
+            groupInvoices.sort(Comparator.comparingDouble(Invoice::getAmount));
 
-            // Find the first invoice with a reasonable amount
+            // Find first invoice with reasonable amount
             Invoice selected = null;
-            for (Invoice inv : group) {
+            for (Invoice inv : groupInvoices) {
                 double amount = inv.getAmount();
                 if (amount > MIN_AMOUNT && amount < MAX_AMOUNT) {
                     selected = inv;
@@ -180,23 +184,23 @@ public class InvoiceStorage {
                 }
             }
 
-            // If no invoice with reasonable amount found, select the first one (if any)
-            if (selected == null && !group.isEmpty()) {
-                selected = group.get(0);
+            // If no reasonable amount, use first invoice
+            if (selected == null && !groupInvoices.isEmpty()) {
+                selected = groupInvoices.get(0);
                 LOGGER.info("No invoice with reasonable amount found for email ID: " +
-                        selected.getEmailId() + ", using first available invoice with amount: " +
+                        emailId + ", using first available invoice with amount: " +
                         selected.getAmount());
             }
 
             if (selected != null) {
-                filteredInvoices.add(selected);
+                bestInvoices.put(emailId, selected);
             }
         }
 
-        // Now group the filtered invoices by year and domain for tax purposes
+        // Now we have one invoice per email ID - group them by year and domain
         Map<Integer, Map<String, List<Invoice>>> yearDomainGroups = new HashMap<>();
 
-        for (Invoice invoice : filteredInvoices) {
+        for (Invoice invoice : bestInvoices.values()) {
             int year = invoice.getYear();
 
             // Extract domain from email
@@ -206,7 +210,7 @@ public class InvoiceStorage {
                 domain = "unknown";
             }
 
-            // Create nested structure if needed
+            // Create structure if needed
             if (!yearDomainGroups.containsKey(year)) {
                 yearDomainGroups.put(year, new HashMap<>());
             }
@@ -216,11 +220,11 @@ public class InvoiceStorage {
                 domainMap.put(domain, new ArrayList<>());
             }
 
-            // Add invoice to the list
+            // Add to domain's invoice list
             domainMap.get(domain).add(invoice);
         }
 
-        // Save invoices to year/domain folders
+        // Save domain reports
         for (Map.Entry<Integer, Map<String, List<Invoice>>> yearEntry : yearDomainGroups.entrySet()) {
             int year = yearEntry.getKey();
 
@@ -228,11 +232,18 @@ public class InvoiceStorage {
                 String domain = domainEntry.getKey();
                 List<Invoice> domainInvoices = domainEntry.getValue();
 
-                // Create folder for year/domain
+                // Sort by date for readability
+                domainInvoices.sort(Comparator
+                        .comparing(Invoice::getYear)
+                        .thenComparing(Invoice::getMonth)
+                        .thenComparing(Invoice::getDay));
+
+                // Create domain summary folder
                 File folderPath = new File(baseDirectory,
-                        "DomainTaxReports" + File.separator +
+                        processName + File.separator +
                                 year + File.separator +
-                                sanitizeFileName(domain));
+                                sanitizeFileName(domain) + File.separator +
+                                "_DomainSummary");
 
                 if (!folderPath.exists()) {
                     folderPath.mkdirs();
@@ -240,15 +251,12 @@ public class InvoiceStorage {
 
                 // Create invoices.tsv file
                 File invoicesFile = new File(folderPath, "invoices.tsv");
-                boolean fileExists = invoicesFile.exists();
 
-                try (FileWriter writer = new FileWriter(invoicesFile, true)) {
-                    // Write header if file is new
-                    if (!fileExists) {
-                        writer.write(Invoice.header());
-                    }
+                try (FileWriter writer = new FileWriter(invoicesFile, false)) { // Overwrite existing file
+                    // Write header
+                    writer.write(Invoice.header());
 
-                    // Write invoice data
+                    // Write invoice data (one per email)
                     for (Invoice invoice : domainInvoices) {
                         writer.write(invoice.toString());
                     }
