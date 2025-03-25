@@ -56,7 +56,7 @@ public class EnhancedInvoiceProcessor extends BackgroundTask {
         this.parser = new InvoiceParser(config);
         this.reportGenerator = new InvoiceReportGenerator();
 
-       // Create output directory
+        // Create output directory
         File outputDirectory = config.getOutputDirectory();
         outputDirectory.mkdirs();
 
@@ -73,7 +73,7 @@ public class EnhancedInvoiceProcessor extends BackgroundTask {
      */
     @Override
     public String execute(ProgressStatusCallback callback) throws InterruptedException {
-        callback.update(0, "Initializing enhanced invoice processor...");
+        callback.update(0, "Initializing enhanced invoice processor with domain-based organization...");
 
         Store store = null;
         int totalInvoicesFound = 0;
@@ -131,7 +131,7 @@ public class EnhancedInvoiceProcessor extends BackgroundTask {
                     // Process messages in this folder
                     Message[] messages = folder.getMessages();
 
-                    // ADD THIS SECTION: Sort messages by date (newest first)
+                    // Sort messages by date (newest first)
                     Arrays.sort(messages, (m1, m2) -> {
                         try {
                             Date date1 = m1.getReceivedDate();
@@ -206,7 +206,7 @@ public class EnhancedInvoiceProcessor extends BackgroundTask {
             }
 
             // Step 4: Generate reports using collected statistics
-            callback.update(90, "Generating reports...");
+            callback.update(90, "Generating reports and domain-based tax organization...");
 
             if (totalInvoicesFound == 0) {
                 callback.update(100, "No invoices found");
@@ -223,7 +223,9 @@ public class EnhancedInvoiceProcessor extends BackgroundTask {
             String reportResult = reportGenerator.generateReports(allInvoices, config.getOutputDirectory());
 
             callback.update(100, "Completed: " + reportResult);
-            return "Found " + totalInvoicesFound + " invoices. " + reportResult;
+            return "Found " + totalInvoicesFound + " invoices. " + reportResult +
+                    "\nDomain-based tax reports created in " +
+                    config.getOutputDirectory().getPath() + File.separator + "DomainTaxReports";
 
         } catch (InterruptedException e) {
             throw e;
