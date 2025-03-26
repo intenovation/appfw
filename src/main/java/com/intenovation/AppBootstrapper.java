@@ -11,7 +11,6 @@ import com.intenovation.email.downloader.ImapDownloader;
 import com.intenovation.email.ui.EmailBrowserIntegration;
 import com.intenovation.invoice.InvoiceAnalyzerApp;
 import com.intenovation.invoice.InvoiceConfiguration;
-import com.intenovation.invoice.InvoiceProcessor;
 import com.intenovation.invoice.EnhancedInvoiceProcessor;
 
 import java.time.Year;
@@ -175,9 +174,6 @@ public class AppBootstrapper {
 
         // Cleanup task
         tasks.add(new EmailCleanup(emailConfig.getCleanupIntervalHours()));
-
-        // Invoice tasks
-        tasks.add(new InvoiceProcessor(invoiceConfig, uiService));
 
         // Add the Enhanced Invoice Processor
         tasks.add(new EnhancedInvoiceProcessor(invoiceConfig, uiService));
