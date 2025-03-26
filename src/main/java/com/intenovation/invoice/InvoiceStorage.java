@@ -242,8 +242,7 @@ public class InvoiceStorage {
                 File folderPath = new File(baseDirectory,
                         processName + File.separator +
                                 year + File.separator +
-                                sanitizeFileName(domain) + File.separator +
-                                "_DomainSummary");
+                                sanitizeFileName(domain) );
 
                 if (!folderPath.exists()) {
                     folderPath.mkdirs();
