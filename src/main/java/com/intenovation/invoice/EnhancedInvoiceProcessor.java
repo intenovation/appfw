@@ -78,6 +78,9 @@ public class EnhancedInvoiceProcessor extends BackgroundTask {
         Store store = null;
         int totalInvoicesFound = 0;
 
+        // Collection to store all invoices for domain-based organization
+        List<Invoice> allInvoices = new ArrayList<>();
+
         try {
             // Step 1: Open the local mail store
             callback.update(5, "Opening local mail store " + config.getEmailDirectory());
@@ -170,8 +173,11 @@ public class EnhancedInvoiceProcessor extends BackgroundTask {
                             List<Invoice> messageInvoices = processMessage(message, callback);
 
                             if (!messageInvoices.isEmpty()) {
-                                // Save invoices immediately
-                                storage.saveInvoicesToFolders(messageInvoices);
+                                // Save invoices to hierarchical folders only, skip domain folders for now
+                                storage.saveInvoicesToFolders(messageInvoices, false);
+
+                                // Add to the all invoices list for later domain processing
+                                allInvoices.addAll(messageInvoices);
 
                                 // Keep track of invoices for statistics
                                 folderInvoices.addAll(messageInvoices);
@@ -205,8 +211,13 @@ public class EnhancedInvoiceProcessor extends BackgroundTask {
                 }
             }
 
-            // Step 4: Generate reports using collected statistics
+            // Step 4: Process domain-based organization with all collected invoices
             callback.update(90, "Generating reports and domain-based tax organization...");
+
+            if (!allInvoices.isEmpty()) {
+                // Process domain folders once with all invoices
+                storage.saveToDomainFolders(allInvoices);
+            }
 
             if (totalInvoicesFound == 0) {
                 callback.update(100, "No invoices found");
@@ -214,13 +225,13 @@ public class EnhancedInvoiceProcessor extends BackgroundTask {
             }
 
             // Flatten all invoices for the main report
-            List<Invoice> allInvoices = new ArrayList<>();
+            List<Invoice> allInvoicesForReport = new ArrayList<>();
             for (List<Invoice> folderInvoices : statistics.values()) {
-                allInvoices.addAll(folderInvoices);
+                allInvoicesForReport.addAll(folderInvoices);
             }
 
             // Generate main invoice reports
-            String reportResult = reportGenerator.generateReports(allInvoices, config.getOutputDirectory());
+            String reportResult = reportGenerator.generateReports(allInvoicesForReport, config.getOutputDirectory());
 
             callback.update(100, "Completed: " + reportResult);
             return "Found " + totalInvoicesFound + " invoices. " + reportResult +

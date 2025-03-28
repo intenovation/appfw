@@ -52,6 +52,16 @@ public class InvoiceStorage {
      * @param invoices The list of invoices to save
      */
     public void saveInvoicesToFolders(List<Invoice> invoices) {
+        saveInvoicesToFolders(invoices, true);
+    }
+
+    /**
+     * Save invoice data to organized folders with option to include domain folders
+     *
+     * @param invoices The list of invoices to save
+     * @param includeDomainFolders Whether to also save to domain-based folders
+     */
+    public void saveInvoicesToFolders(List<Invoice> invoices, boolean includeDomainFolders) {
         // Group invoices by year, domain, email, and date+subject
         Map<Integer, Map<String, Map<String, Map<String, List<Invoice>>>>> groupedInvoices = new HashMap<>();
 
@@ -140,8 +150,10 @@ public class InvoiceStorage {
             }
         }
 
-        // Also save domain-based reports for tax purposes
-        saveToDomainFolders(invoices);
+        // Also save domain-based reports for tax purposes if requested
+        if (includeDomainFolders) {
+            saveToDomainFolders(invoices);
+        }
     }
 
     /**
@@ -150,7 +162,7 @@ public class InvoiceStorage {
      *
      * @param invoices The list of invoices to save
      */
-    private void saveToDomainFolders(List<Invoice> invoices) {
+    public void saveToDomainFolders(List<Invoice> invoices) {
         // Track unique email IDs to avoid duplicates
         Map<String, Invoice> bestInvoices = new HashMap<>();
 
