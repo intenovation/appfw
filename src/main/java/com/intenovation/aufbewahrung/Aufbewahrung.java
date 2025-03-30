@@ -490,26 +490,25 @@ public class Aufbewahrung {
         if (invoice.amount == 0.0)
             return;
 
-
         File invoices = new File(folderName + "/invoices.tsv");
         // System.out.println("Writing" + invoices.getAbsolutePath());
         if (!invoices.getParentFile().exists()) {
             invoices.getParentFile().mkdirs();
         }
         boolean exists = invoices.exists();
-        BufferedWriter out = new BufferedWriter(new FileWriter(invoices, true));
-        if (!exists /* || !containsText(invoices, Invoice.header()) */) {
-            out.write(Invoice.header());
-        }
-        // Open given file in append mode by creating an
-        // object of BufferedWriter class
-        // Writing on output stream
-        if (!containsText(invoices, invoice.toString())) {
-            out.write(invoice.toString());
-        }
 
-        // Closing the connection
-        out.close();
+        // Check if the invoice already exists in the file
+        boolean invoiceExists = exists && containsText(invoices, invoice.toString());
+
+        // Only write if the invoice doesn't already exist
+        if (!invoiceExists) {
+            BufferedWriter out = new BufferedWriter(new FileWriter(invoices, true));
+            if (!exists) {
+                out.write(Invoice.header());
+            }
+            out.write(invoice.toString());
+            out.close();
+        }
     }
 
     private static boolean containsText(File f, String t) {
@@ -517,16 +516,14 @@ public class Aufbewahrung {
             Scanner scanner = new Scanner(f);
 
             // now read the file line by line...
-            int lineNum = 0;
             while (scanner.hasNextLine()) {
                 String line = scanner.nextLine();
-                lineNum++;
-                if (t.contains(line)) {
-                    // System.out.println("Line already exists " + lineNum +
-                    // line);
+                if (line.equals(t.trim())) {
+                    scanner.close();
                     return true;
                 }
             }
+            scanner.close();
         } catch (FileNotFoundException e) {
             return false;
         }

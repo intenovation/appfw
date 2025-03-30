@@ -1,6 +1,8 @@
 package com.intenovation.invoice;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
@@ -132,15 +134,36 @@ public class InvoiceStorage {
                         File invoicesFile = new File(folderPath, "invoices.tsv");
                         boolean fileExists = invoicesFile.exists();
 
-                        try (FileWriter writer = new FileWriter(invoicesFile, true)) {
-                            // Write header if file is new
-                            if (!fileExists) {
-                                writer.write(Invoice.header());
+                        try {
+                            // Read existing content to avoid duplicates
+                            Set<String> existingLines = new HashSet<>();
+                            if (fileExists) {
+                                try (BufferedReader reader = new BufferedReader(new FileReader(invoicesFile))) {
+                                    String line;
+                                    while ((line = reader.readLine()) != null) {
+                                        // Skip header
+                                        if (!line.startsWith("ID\tYear\tMonth\tDay\t")) {
+                                            existingLines.add(line);
+                                        }
+                                    }
+                                }
                             }
 
-                            // Write invoice data
-                            for (Invoice invoice : dirInvoices) {
-                                writer.write(invoice.toString());
+                            // Write to file, only adding non-duplicate entries
+                            try (FileWriter writer = new FileWriter(invoicesFile, fileExists)) {
+                                // Write header if file is new
+                                if (!fileExists) {
+                                    writer.write(Invoice.header());
+                                }
+
+                                // Write invoice data for non-duplicates
+                                for (Invoice invoice : dirInvoices) {
+                                    String invoiceStr = invoice.toString().trim();
+                                    if (!existingLines.contains(invoiceStr)) {
+                                        writer.write(invoiceStr + "\n");
+                                        existingLines.add(invoiceStr);
+                                    }
+                                }
                             }
                         } catch (IOException e) {
                             LOGGER.log(Level.SEVERE, "Error writing to invoices.tsv", e);
@@ -263,13 +286,33 @@ public class InvoiceStorage {
                 // Create invoices.tsv file
                 File invoicesFile = new File(folderPath, "invoices.tsv");
 
-                try (FileWriter writer = new FileWriter(invoicesFile, false)) { // Overwrite existing file
-                    // Write header
-                    writer.write(Invoice.header());
+                try {
+                    // Read existing content to avoid duplicates
+                    Set<String> existingLines = new HashSet<>();
+                    if (invoicesFile.exists()) {
+                        try (BufferedReader reader = new BufferedReader(new FileReader(invoicesFile))) {
+                            String line;
+                            while ((line = reader.readLine()) != null) {
+                                // Skip header
+                                if (!line.startsWith("ID\tYear\tMonth\tDay\t")) {
+                                    existingLines.add(line);
+                                }
+                            }
+                        }
+                    }
 
-                    // Write invoice data (one per email)
-                    for (Invoice invoice : domainInvoices) {
-                        writer.write(invoice.toString());
+                    try (FileWriter writer = new FileWriter(invoicesFile, false)) { // Overwrite existing file but preserve uniqueness
+                        // Write header
+                        writer.write(Invoice.header());
+
+                        // Write invoice data (one per email), avoiding duplicates
+                        for (Invoice invoice : domainInvoices) {
+                            String invoiceStr = invoice.toString().trim();
+                            if (!existingLines.contains(invoiceStr)) {
+                                writer.write(invoiceStr + "\n");
+                                existingLines.add(invoiceStr);
+                            }
+                        }
                     }
                 } catch (IOException e) {
                     LOGGER.log(Level.SEVERE, "Error writing to domain invoices.tsv", e);
