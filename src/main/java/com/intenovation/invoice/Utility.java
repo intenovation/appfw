@@ -28,6 +28,8 @@ public enum Utility {
     WaterFilter("Haugue", "hallswater", "Culligan"),
     Umbrella("A332964758"),
     Boat("********87466"),
+    Notary("Notar","Schickering"),
+    Realtor("Makler","planethome","engelvoelkers"),
     Unknown;
 
     private Set<String> synonyms = new HashSet<>();
